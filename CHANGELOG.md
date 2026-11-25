@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/NitriKx/terraform-trufo-ai-provider/compare/v0.1.0...v0.2.0) (2026-11-25)
+
+
+### Features
+
+* initial Trufo Terraform provider with trufo-go client ([0a9e4e7](https://github.com/NitriKx/terraform-trufo-ai-provider/commit/0a9e4e761b001e1873b1ebe6aa5689f3078e7c11))
+
 ## 0.1.0 (unreleased)
 
 - `trufo-go` client library (`github.com/NitriKx/terraform-trufo-ai-provider/trufo-go`), ported from
