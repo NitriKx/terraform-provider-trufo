@@ -22,7 +22,8 @@ archives:
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 
 checksum:
-  name_template: 'checksums.txt'
+  # The Terraform Registry requires the release to contain a SHA256SUMS file.
+  name_template: 'SHA256SUMS'
 
 # Optional commit/tag signing with cosign once keys are configured:
 # signs:
