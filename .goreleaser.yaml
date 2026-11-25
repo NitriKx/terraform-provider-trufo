@@ -1,6 +1,17 @@
+# Mirrors hashicorp/terraform-provider-scaffolding-framework's .goreleaser.yml,
+# which produces exactly the assets the Terraform Registry requires:
+#   - zips terraform-provider-trufo_<ver>_<os>_<arch>.zip containing the binary
+#     named terraform-provider-trufo_v<ver>
+#   - terraform-provider-trufo_<ver>_SHA256SUMS (zips + manifest) and its GPG
+#     signature .sig
+#   - terraform-provider-trufo_<ver>_manifest.json (from terraform-registry-manifest.json)
 version: 2
 
 project_name: terraform-provider-trufo
+
+before:
+  hooks:
+    - go mod tidy
 
 builds:
   - env:
@@ -12,9 +23,11 @@ builds:
     goarch:
       - amd64
       - arm64
-    binary: terraform-provider-trufo
+    binary: '{{ .ProjectName }}_v{{ .Version }}'
+    flags:
+      - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - '-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}'
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
@@ -22,25 +35,32 @@ archives:
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 
 checksum:
-  # The Terraform Registry requires the release to contain a SHA256SUMS file.
-  name_template: 'SHA256SUMS'
+  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  algorithm: sha256
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
 
-# Optional commit/tag signing with cosign once keys are configured:
-# signs:
-#   - artifacts: checksum
-#     cmd: cosign
-#     args: ['sign-blob', '--yes', '${artifact}']
-#     output: '${artifact}.sig'
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--pinentry-mode"
+      - "loopback"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
 
 release:
   github:
     owner: NitriKx
     name: terraform-provider-trufo
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
-      - '^chore:'
+  disable: true # release-please manages CHANGELOG.md

@@ -1,20 +1,18 @@
 # Tags/releases are created by release-please (release-please.yml) from
-# conventional commits on main. This workflow then builds the provider
-# binaries and attaches them to the release for the tag (goreleaser reuses
-# the existing GitHub release created by release-please).
+# conventional commits on main. This workflow then builds and GPG-signs the
+# provider release assets, mirroring the terraform-provider-scaffolding-framework
+# release workflow. Tag pushes made with GITHUB_TOKEN do not trigger
+# workflows, so this is also runnable manually: gh workflow run Release -f tag=vX.Y.Z
 name: Release
 
 on:
   push:
     tags:
       - 'v*'
-  # Manual fallback for when the tag was pushed with GITHUB_TOKEN (which does
-  # not trigger workflows):
-  #   gh workflow run Release -f tag=v0.2.0
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build and release (e.g. v0.2.0); checked out before goreleaser runs'
+        description: 'Tag to build and release (e.g. v1.0.0); checked out before goreleaser runs'
         required: true
         type: string
 
@@ -36,16 +34,19 @@ jobs:
           cache-dependency-path: |
             go.sum
             trufo-go/go.sum
-      - name: Build and archive (dry-run sanity)
-        run: go build ./...
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Publishing to the Terraform Registry is done from the registry UI
-  # (registry.terraform.io) linking this GitHub release — see README.md
-  # "Release process". A registry API token is only needed if you automate
-  # that step; the UI publish is enough to start.
+          GPG_FINGERPRINT: ${{ secrets.GPG_FINGERPRINT }}
+          PASSPHRASE: ${{ secrets.PASSPHRASE }}
