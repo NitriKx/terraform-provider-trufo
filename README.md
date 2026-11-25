@@ -117,8 +117,12 @@ use `https://api.trufo.ai`, override with `TRUFO_PROD_API_URL`) and need:
 2. Releases are automated with [release-please](.github/workflows/release-please.yml): on every
    push to `main` it opens a "release PR" that bumps the version (from conventional commits) and
    updates `CHANGELOG.md`. Merging that PR creates the `vX.Y.Z` tag and GitHub release.
-   No custom token needed — the workflow uses the automatic `GITHUB_TOKEN` with
-   `contents: write` + `pull-requests: write`.
+   The workflow uses the automatic `GITHUB_TOKEN` (`contents: write` + `pull-requests: write`).
+   Note: tag pushes made with `GITHUB_TOKEN` do not trigger new workflow runs, so the `Release`
+   (goreleaser) workflow is also runnable manually (`workflow_dispatch`, `ref=vX.Y.Z`), or
+   automatically if you give release-please a PAT instead: create a classic PAT with `repo` scope,
+   store it as repo secret `RELEASE_PLEASE_TOKEN`, and pass `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`
+   to the release-please action — then the tag push triggers the Release workflow by itself.
 3. On the tag, the `Release` workflow runs [goreleaser](.goreleaser.yaml): builds the provider for
    linux/darwin/windows (amd64/arm64), writes `checksums.txt`, and attaches everything to the
    release.

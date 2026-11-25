@@ -8,6 +8,13 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or branch to release (e.g. v0.2.0) — used when tag pushes are made with GITHUB_TOKEN, which does not trigger workflows'
+        required: true
+        default: main
+        type: string
 
 permissions:
   contents: write

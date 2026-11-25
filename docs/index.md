@@ -1,4 +1,11 @@
 
+---
+page_title: "Trufo Provider"
+description: |-
+  The Trufo provider manages Trufo Provenance Platform resources (generator product instances,
+  instance credentials, AI systems, certificates) through the Trufo API.
+---
+
 # Trufo Provider
 
 The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance Platform through the Trufo API:
