@@ -38,7 +38,7 @@ jobs:
             trufo-go/go.sum
       - name: Build and archive (dry-run sanity)
         run: go build ./...
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
           args: release --clean
