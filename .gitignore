@@ -1,0 +1,19 @@
+# Binaries
+/dist/
+/terraform-provider-trufo*
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Local secrets — never commit credentials
+*.pem
+trufo-api-key
+.env
+
+# Editor/OS
+.DS_Store
+*.swp

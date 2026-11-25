@@ -1,0 +1,30 @@
+{{/* Trufo provider index page. */}}
+# Trufo Provider
+
+The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance Platform through the Trufo API:
+
+- **Generator product instances** (`trufo_instance`) — one signing identity per independent key holder
+- **Instance credentials** (`trufo_instance_credential`) — public-key enrollment on an instance (delete = revoke)
+- **AI systems** (`trufo_ai_system`) — registered AI systems referenced when signing and watermarking
+- **Read-only lookups** — `trufo_generator_product` and `trufo_certificates` data sources
+
+The API client used by the provider is [`github.com/mistral/trufo-go`](./trufo-go), a Go port of the official
+[Python SDK](https://github.com/trufo-ai/trufo-py).
+
+## Authentication
+
+Every API request carries exactly one credential. The provider supports both, like the Python SDK:
+
+- **API key** — `api_key` attribute or `TRUFO_API_KEY` env var, sent as `X-API-Key: {scope}:{key}`.
+  A `gproduct-admin` scoped key manages instances and credentials; `c2pa-sign-*`/`watermark-*` keys cover the
+  AI system endpoints (production hosts only).
+- **Access token** — `access_token` + `refresh_token` (env `TRUFO_ACCESS_TOKEN` / `TRUFO_REFRESH_TOKEN`),
+  sent as `Authorization: Bearer`, refreshed automatically on 401. Required for `trufo_generator_product` and
+  `trufo_certificates`. If only a `trufo-api` scoped `api_key` is set, the provider runs the interactive login
+  at configure time (`auth_flow`: `auto`/`loopback`/`device`/`none`).
+
+## Example usage
+
+{{tffile "examples/provider/provider.tf"}}
+
+{{ .SchemaMarkdown }}
