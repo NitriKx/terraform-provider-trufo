@@ -24,15 +24,16 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
-signs:
-  - artifacts: checksum
-    cmd: cosign
-    args: ['sign-blob', '--yes', '${artifact}']
-    output: '${artifact}.sig'
+# Optional commit/tag signing with cosign once keys are configured:
+# signs:
+#   - artifacts: checksum
+#     cmd: cosign
+#     args: ['sign-blob', '--yes', '${artifact}']
+#     output: '${artifact}.sig'
 
 release:
   github:
-    owner: mistral
+    owner: NitriKx
     name: terraform-trufo-ai-provider
 
 changelog:

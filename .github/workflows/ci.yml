@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,15 +23,19 @@ jobs:
           cache-dependency-path: |
             go.sum
             trufo-go/go.sum
-      - name: Build
-        run: go build ./...
+      - name: Build (provider + client)
+        run: |
+          go build ./...
+          (cd trufo-go && go build ./...)
       - name: Unit tests (provider)
         run: go test ./...
       - name: Unit tests (trufo-go)
         working-directory: trufo-go
         run: go test ./...
       - name: gofmt
-        run: test -z "$(gofmt -l . trufo-go)"
+        run: |
+          test -z "$(gofmt -l .)"
+          test -z "$(cd trufo-go && gofmt -l .)"
       - name: go vet
         run: |
           go vet ./...
@@ -42,11 +50,13 @@ jobs:
           go-version: '1.27'
       - name: Generate docs and check they are up to date
         run: |
-          go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
+          go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name trufo
           test -z "$(git status --porcelain docs examples templates)"
 
   acceptance:
-    # Manual only: needs Trufo test credentials as repository secrets.
+    # Manual only: needs Trufo credentials as repository secrets.
+    # secrets: TRUFO_TEST_API_KEY (gproduct-admin), TRUFO_ACCESS_TOKEN +
+    # TRUFO_REFRESH_TOKEN (device-flow session), TRUFO_TEST_GP_ID.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:

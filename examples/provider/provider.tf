@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     trufo = {
-      source = "mistral/trufo"
+      source = "nitrikx/trufo"
     }
   }
 }

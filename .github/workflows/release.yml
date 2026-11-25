@@ -1,3 +1,7 @@
+# Tags/releases are created by release-please (release-please.yml) from
+# conventional commits on main. This workflow then builds the provider
+# binaries and attaches them to the release for the tag (goreleaser reuses
+# the existing GitHub release created by release-please).
 name: Release
 
 on:
@@ -9,7 +13,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  goreleaser:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,9 +22,19 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.27'
+          cache-dependency-path: |
+            go.sum
+            trufo-go/go.sum
+      - name: Build and archive (dry-run sanity)
+        run: go build ./...
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publishing to the Terraform Registry is done from the registry UI
+  # (registry.terraform.io) linking this GitHub release — see README.md
+  # "Release process". A registry API token is only needed if you automate
+  # that step; the UI publish is enough to start.

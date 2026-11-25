@@ -1,5 +1,5 @@
 // Package provider implements the Trufo Terraform provider
-// (registry.terraform.io/mistral/trufo).
+// (registry.terraform.io/nitrikx/trufo).
 package provider
 
 import (
@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/mistral/trufo-go"
+	trufo "github.com/NitriKx/terraform-trufo-ai-provider/trufo-go"
 )
 
 // Env vars, mirroring the trufo-py SDK (TRUFO_API_KEY, TRUFO_ACCESS_TOKEN,

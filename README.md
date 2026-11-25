@@ -1,12 +1,12 @@
 # Terraform Provider for Trufo
 
-[![CI](https://github.com/mistral/terraform-trufo-ai-provider/actions/workflows/ci.yml/badge.svg)](https://github.com/mistral/terraform-trufo-ai-provider/actions/workflows/ci.yml)
+[![CI](https://github.com/NitriKx/terraform-trufo-ai-provider/actions/workflows/ci.yml/badge.svg)](https://github.com/NitriKx/terraform-trufo-ai-provider/actions/workflows/ci.yml)
 
 Terraform provider for the [Trufo](https://trufo.ai) Provenance Platform, built on
-[`github.com/mistral/trufo-go`](./trufo-go) — a Go client ported from the official
+[`github.com/NitriKx/terraform-trufo-ai-provider/trufo-go`](./trufo-go) — a Go client ported from the official
 [Python SDK (trufo-py)](https://github.com/trufo-ai/trufo-py).
 
-Provider address: `registry.terraform.io/mistral/trufo`
+Provider address: `registry.terraform.io/nitrikx/trufo`
 
 ## Resources & data sources
 
@@ -58,7 +58,7 @@ provider "trufo" {
 terraform {
   required_providers {
     trufo = {
-      source = "mistral/trufo"
+      source = "nitrikx/trufo"
     }
   }
 }
@@ -102,6 +102,34 @@ use `https://api.trufo.ai`, override with `TRUFO_PROD_API_URL`) and need:
   `trufo-api` scoped key (`trufo login --device` with the Python SDK); covers the product/certificate data
   sources and the AI system endpoints
 - `TRUFO_TEST_GP_ID` — a test generator product created in the dashboard's Test view
+
+## Repository & provider address
+
+- Source: <https://github.com/NitriKx/terraform-trufo-ai-provider>
+- Provider address: `registry.terraform.io/nitrikx/trufo` (Terraform source: `nitrikx/trufo`)
+
+## Release process
+
+1. Create the GitHub repo `NitriKx/terraform-trufo-ai-provider` and push. You need a one-off
+   credential for this (a PAT with `repo` scope, or SSH) — the API being down only affects
+   `gh repo create`; creating the repo in the web UI and pushing works the same:
+   `git remote add origin https://github.com/NitriKx/terraform-trufo-ai-provider.git && git push -u origin main`
+2. Releases are automated with [release-please](.github/workflows/release-please.yml): on every
+   push to `main` it opens a "release PR" that bumps the version (from conventional commits) and
+   updates `CHANGELOG.md`. Merging that PR creates the `vX.Y.Z` tag and GitHub release.
+   No custom token needed — the workflow uses the automatic `GITHUB_TOKEN` with
+   `contents: write` + `pull-requests: write`.
+3. On the tag, the `Release` workflow runs [goreleaser](.goreleaser.yaml): builds the provider for
+   linux/darwin/windows (amd64/arm64), writes `checksums.txt`, and attaches everything to the
+   release.
+4. Publish the version on the Terraform Registry: sign in at <https://registry.terraform.io>
+   with the GitHub account, add provider `nitrikx/trufo`, and publish the release (the UI links
+   the GitHub release and verifies checksums). Only if you want to automate this step do you
+   need a registry API token (profile → tokens at registry.terraform.io).
+5. CI (`CI` workflow) runs on every push/PR: build, `go vet`, `gofmt`, unit tests for both modules,
+   and a docs freshness check. Acceptance tests run manually via `workflow_dispatch` with the
+   Trufo secrets configured on the repo (`TRUFO_TEST_API_KEY`, `TRUFO_ACCESS_TOKEN`,
+   `TRUFO_REFRESH_TOKEN`, `TRUFO_TEST_GP_ID`).
 
 ## License
 

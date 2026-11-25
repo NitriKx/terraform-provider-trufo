@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/mistral/trufo-go"
+	trufo "github.com/NitriKx/terraform-trufo-ai-provider/trufo-go"
 )
 
 var _ datasource.DataSource = (*certificatesDataSource)(nil)
