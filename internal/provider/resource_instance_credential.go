@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/mistral/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var (
@@ -62,7 +62,9 @@ func (r *instanceCredentialResource) Schema(_ context.Context, _ resource.Schema
 			"(`POST /gproduct/instance/credential/register`). The matching private key signs the client assertion that " +
 			"requests CSR JWTs for certificate enrollment; the private key never leaves your systems. " +
 			"An instance may hold at most **two active credentials**: register the replacement, cut over, then revoke the old one. " +
-			"Deleting this resource revokes the credential (permanent).",
+			"Deleting this resource revokes the credential (permanent). " +
+			"Auth: an MFA-verified access token (`access_token`/`refresh_token`). On the test host, a " +
+			"`gproduct-admin` scoped API key is also accepted (verified against test.api.trufo.ai; the scope is not listed in the trufo-py docs).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -137,7 +139,16 @@ func (r *instanceCredentialResource) Create(ctx context.Context, req resource.Cr
 
 	cred, err := findCredential(ctx, client, plan.GPIID.ValueString(), gpicID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read credential after register", err.Error())
+		resp.Diagnostics.AddError("Failed to read credential after register",
+			err.Error()+fmt.Sprintf(" (the credential %s was registered server-side; import it with: terraform import trufo_instance_credential.<name> %s/%s)", gpicID, plan.GPIID.ValueString(), gpicID))
+		return
+	}
+	if cred == nil {
+		// Created but not yet visible in the list (eventual consistency).
+		resp.Diagnostics.AddError(
+			"Credential created but not yet listed",
+			fmt.Sprintf("The credential %s was registered server-side but is not yet visible in the instance's credential list. Rerun apply, or import it with: terraform import trufo_instance_credential.<name> %s/%s", gpicID, plan.GPIID.ValueString(), gpicID),
+		)
 		return
 	}
 	setCredentialState(&plan, cred)
@@ -215,7 +226,10 @@ func (r *instanceCredentialResource) Delete(ctx context.Context, req resource.De
 	client := r.client
 
 	// Deleting the resource revokes the credential. Revocation is permanent.
-	if err := client.RevokeCredential(ctx, state.ID.ValueString()); err != nil && !trufo.Is(err, 404, "") {
+	// Tolerate 404 (already gone) and 400 AlreadyRevoked so destroy stays
+	// idempotent when the credential was revoked out of band.
+	if err := client.RevokeCredential(ctx, state.ID.ValueString()); err != nil &&
+		!trufo.Is(err, 404, "") && !trufo.Is(err, 400, "AlreadyRevoked") {
 		resp.Diagnostics.AddError("Failed to revoke instance credential", err.Error())
 		return
 	}

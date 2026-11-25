@@ -2,14 +2,15 @@ package provider
 
 import (
 	"context"
-	"strconv"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/mistral/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var _ datasource.DataSource = (*certificatesDataSource)(nil)
@@ -82,7 +83,7 @@ func (d *certificatesDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Stable identifier for this list (number of certificates).",
+				MarkdownDescription: "Stable identifier for this list (hash of the certificate serial numbers).",
 			},
 			"certs": schema.ListNestedAttribute{
 				Computed:            true,
@@ -130,7 +131,14 @@ func (d *certificatesDataSource) Read(ctx context.Context, req datasource.ReadRe
 		objs = append(objs, obj)
 	}
 
-	cfg.ID = types.StringValue(strconv.Itoa(len(certs)))
+	// Stable ID: a hash of the serial numbers, so it does not change merely
+	// because the certificate count changed.
+	h := sha256.New()
+	for _, c := range certs {
+		h.Write([]byte(c.SerialNumber))
+		h.Write([]byte{0})
+	}
+	cfg.ID = types.StringValue(hex.EncodeToString(h.Sum(nil))[:16])
 	cfg.Certs = types.ListValueMust(certificateObjectType(), objs)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &cfg)...)

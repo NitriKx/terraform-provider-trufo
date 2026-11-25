@@ -1,4 +1,11 @@
 {{/* Trufo provider index page. */}}
+---
+page_title: "Trufo Provider"
+description: |-
+  The Trufo provider manages Trufo Provenance Platform resources (generator product instances,
+  instance credentials, AI systems, certificates) through the Trufo API.
+---
+
 # Trufo Provider
 
 The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance Platform through the Trufo API:
@@ -8,8 +15,33 @@ The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance
 - **AI systems** (`trufo_ai_system`) — registered AI systems referenced when signing and watermarking
 - **Read-only lookups** — `trufo_generator_product` and `trufo_certificates` data sources
 
-The API client used by the provider is [`github.com/mistral/trufo-go`](./trufo-go), a Go port of the official
+The API client used by the provider is [`github.com/NitriKx/terraform-provider-trufo/trufo-go`](https://github.com/NitriKx/terraform-provider-trufo/tree/main/trufo-go), a Go port of the official
 [Python SDK](https://github.com/trufo-ai/trufo-py).
+
+## Regions and hosts
+
+The provider defaults to the **global production API** (`https://api.trufo.ai`). Pick another host with `region`
+or a full `api_url` (or the `TRUFO_API_URL` environment variable):
+
+| Host | `region` | Use |
+| --- | --- | --- |
+| `https://api.trufo.ai` | `global` (default) | Production, global |
+| `https://eu.api.trufo.ai` | `eu` | Production, EU — media submitted there is processed and stored in EU infrastructure |
+| `https://test.api.trufo.ai` | `test` | Test API — certificate test flow and test-scoped keys; nothing carries over to production |
+
+```terraform
+provider "trufo" {} # production, global (default)
+
+provider "trufo" {
+  alias  = "eu"
+  region = "eu"
+}
+
+provider "trufo" {
+  alias  = "test"
+  region = "test"
+}
+```
 
 ## Authentication
 
@@ -26,5 +58,15 @@ Every API request carries exactly one credential. The provider supports both, li
 ## Example usage
 
 {{tffile "examples/provider/provider.tf"}}
+
+## Full example
+
+A complete C2PA signing instance with an enrolled key — generator product lookup by name, instance
+creation, and ES256 (EC P-256) public-key enrollment (see
+[`examples/full-signing-instance/`](https://github.com/NitriKx/terraform-provider-trufo/tree/main/examples/full-signing-instance)):
+
+{{tffile "examples/full-signing-instance/main.tf"}}
+
+See also the [key rotation guide](./guides/key-rotation.md).
 
 {{ .SchemaMarkdown }}

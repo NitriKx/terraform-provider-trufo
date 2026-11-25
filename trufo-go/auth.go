@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -15,8 +16,15 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"strings"
+	"sync"
 	"time"
 )
+
+// ErrNoBrowser signals that the loopback flow cannot run because no local
+// browser could be launched or no loopback port could be bound (the headless
+// signal, as in trufo-py). Callers should fall back to the device flow.
+var ErrNoBrowser = errors.New("no local browser available")
 
 // TokenPair holds an access + refresh token pair.
 type TokenPair struct {
@@ -63,7 +71,7 @@ func (c *Client) PollDeviceToken(ctx context.Context, deviceCode string) (*Token
 		if errors.As(err, &ae) && ae.StatusCode == 400 && ae.Detail == "access_denied" {
 			return nil, errors.New("authorization was denied by the user")
 		}
-		if errors.As(err, &ae) && ae.StatusCode == 400 && ae.Detail == "expired_token" {
+		if errors.As(err, &ae) && ae.StatusCode == 400 && (ae.Detail == "expired_token" || ae.Detail == "DeviceCodeNotFound") {
 			return nil, errors.New("device code expired; please try again")
 		}
 		return nil, fmt.Errorf("device token poll failed: %w", err)
@@ -117,11 +125,12 @@ func (c *Client) DeviceFlow(ctx context.Context, prompt func(verificationURIComp
 // /account/refresh). Refresh tokens are single-use and rotated on every call.
 // On success the client's tokens are updated.
 func (c *Client) Refresh(ctx context.Context) error {
-	if c.RefreshToken == "" {
+	_, refresh := c.tokens()
+	if refresh == "" {
 		return errors.New("no refresh token available")
 	}
 	// /account/refresh takes no credential header.
-	body, err := json.Marshal(map[string]any{"refresh_token": c.RefreshToken})
+	body, err := json.Marshal(map[string]any{"refresh_token": refresh})
 	if err != nil {
 		return err
 	}
@@ -132,6 +141,7 @@ func (c *Client) Refresh(ctx context.Context) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
+	req.Header.Set("X-TF-Version", SDKVersion)
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("token refresh failed: %w", err)
@@ -156,12 +166,40 @@ func (c *Client) Refresh(ctx context.Context) error {
 }
 
 // Logout revokes the client's refresh token (idempotent; the access token
-// stays valid until it expires). Auth: access token.
+// stays valid until it expires). Auth: access token. Like Refresh, it goes to
+// AuthURL: the test host has no account routes and accepts tokens issued by
+// the global host.
 func (c *Client) Logout(ctx context.Context) error {
-	if c.AccessToken == "" {
+	access, refresh := c.tokens()
+	if access == "" {
 		return errors.New("no access token")
 	}
-	return c.post(ctx, AccountLogoutPath, map[string]any{"refresh_token": c.RefreshToken}, nil)
+	b, err := json.Marshal(map[string]any{"refresh_token": refresh})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.AuthURL+AccountLogoutPath, bytes.NewReader(b))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", c.UserAgent)
+	req.Header.Set("X-TF-Version", SDKVersion)
+	req.Header.Set("Authorization", "Bearer "+access)
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("logout failed: %w", err)
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		return parseError(resp.StatusCode, resp.Header.Get("X-Request-ID"), respBody)
+	}
+	return nil
 }
 
 // postWithAPIKey posts with the X-API-Key header even when a Bearer token is
@@ -181,6 +219,7 @@ func (c *Client) postWithAPIKey(ctx context.Context, url string, body, out any) 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
+	req.Header.Set("X-TF-Version", SDKVersion)
 	req.Header.Set("X-API-Key", c.APIKey)
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
@@ -211,6 +250,7 @@ func (c *Client) LoopbackLogin(ctx context.Context, appURL string, timeout time.
 	if appURL == "" {
 		appURL = AppURL
 	}
+	appURL = strings.TrimRight(appURL, "/")
 	if timeout <= 0 {
 		timeout = 5 * time.Minute
 	}
@@ -228,18 +268,19 @@ func (c *Client) LoopbackLogin(ctx context.Context, appURL string, timeout time.
 	// would expose the callback — and the authorization code — to the network.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, fmt.Errorf("binding loopback listener: %w", err)
+		return nil, fmt.Errorf("%w: binding loopback listener: %v", ErrNoBrowser, err)
 	}
 	defer ln.Close()
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", ln.Addr().(*net.TCPAddr).Port)
 
 	q := url.Values{}
 	q.Set("code_challenge", challenge)
+	q.Set("code_challenge_method", "S256")
 	q.Set("state", state)
 	q.Set("redirect_uri", redirectURI)
 	authorizeURL := appURL + LoopbackAuthPath + "?" + q.Encode()
 	if !openBrowser(authorizeURL) {
-		return nil, errors.New("no local browser available; use the device flow instead")
+		return nil, fmt.Errorf("%w; use the device flow instead", ErrNoBrowser)
 	}
 
 	type callbackResult struct {
@@ -247,14 +288,22 @@ func (c *Client) LoopbackLogin(ctx context.Context, appURL string, timeout time.
 		state string
 	}
 	resCh := make(chan callbackResult, 1)
+	var once sync.Once
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/callback" {
+		if r.Method != http.MethodGet || r.URL.Path != "/callback" {
 			// Ignore anything that is not our callback (a favicon prefetch,
-			// a port scanner) so it cannot consume the one-shot listener.
+			// a port scanner, a second callback) so it cannot consume the
+			// one-shot listener.
 			http.NotFound(w, r)
 			return
 		}
-		resCh <- callbackResult{code: r.URL.Query().Get("code"), state: r.URL.Query().Get("state")}
+		// Only a callback carrying a code consumes the one-shot wait; a
+		// codeless probe on the right path keeps us waiting, like trufo-py.
+		if code := r.URL.Query().Get("code"); code != "" {
+			once.Do(func() {
+				resCh <- callbackResult{code: code, state: r.URL.Query().Get("state")}
+			})
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, "<html><body style='font-family:sans-serif;text-align:center;padding:60px'><h2>Signed in</h2><p>You can close this window and return to your terminal.</p></body></html>")
 	})}
@@ -269,10 +318,10 @@ func (c *Client) LoopbackLogin(ctx context.Context, appURL string, timeout time.
 		return nil, errors.New("timed out waiting for browser sign-in")
 	case res = <-resCh:
 	}
-	if res.code == "" {
-		return nil, errors.New("sign-in callback arrived without an authorization code")
-	}
-	if res.state != state {
+	// resCh only carries non-empty codes (the handler filters codeless probes).
+	// Constant-time comparison: the state check stops a third party from
+	// feeding us a code that belongs to a flow we did not start.
+	if subtle.ConstantTimeCompare([]byte(res.state), []byte(state)) != 1 {
 		return nil, errors.New("state mismatch on loopback callback; sign-in aborted")
 	}
 
@@ -314,16 +363,22 @@ func randomURLSafe(n int) (string, error) {
 }
 
 // openBrowser tries to open url in the system browser; it returns false when
-// no browser can be launched (the headless signal, as in trufo-py).
-func openBrowser(url string) bool {
-	var cmd *exec.Cmd
+// no browser can be launched (the headless signal, as in trufo-py's
+// webbrowser.open returning False). The command is run with a short timeout:
+// a present-but-broken opener (e.g. xdg-open without a browser) exits non-zero
+// and counts as "no browser" so the caller can fall back to the device flow.
+func openBrowser(rawURL string) bool {
+	var name string
+	var args []string
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", url)
+		name, args = "open", []string{rawURL}
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		name, args = "rundll32", []string{"url.dll,FileProtocolHandler", rawURL}
 	default:
-		cmd = exec.Command("xdg-open", url)
+		name, args = "xdg-open", []string{rawURL}
 	}
-	return cmd.Start() == nil
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, name, args...).Run() == nil
 }

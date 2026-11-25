@@ -1,0 +1,26 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+subcategory: "Instances"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+-> **Note** An instance is one signing identity within a generator product: it holds its own
+credentials and is issued its own certificates. Creating an instance requires the product to have an
+active Product Validation (`pv_active` on the `trufo_generator_product` data source).
+
+## Example Usage
+
+{{ tffile "examples/resources/trufo_instance/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+This resource can be imported using the instance ID (`gpi_…`), e.g.
+
+{{codefile "shell" .ImportFile }}

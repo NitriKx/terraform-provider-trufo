@@ -23,10 +23,7 @@ func testAccPreCheck(t *testing.T) {
 		t.Skip("Acceptance tests skipped unless TF_ACC=1 is set")
 	}
 	if os.Getenv("TRUFO_API_KEY") == "" {
-		t.Skip("TRUFO_API_KEY must be set (a gproduct-admin scoped key) to run acceptance tests")
-	}
-	if testAPIURL() == "" {
-		t.Skip("TRUFO_TEST_API_URL must be set")
+		t.Skip("TRUFO_API_KEY must be set (a gproduct-admin scoped key, accepted for instance/credential endpoints on the test host) to run acceptance tests")
 	}
 	if testGPID() == "" {
 		t.Skip("TRUFO_TEST_GP_ID must be set (a test generator product from the dashboard Test view)")

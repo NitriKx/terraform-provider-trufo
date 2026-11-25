@@ -1,0 +1,10 @@
+# Local variable values (may contain the product/instance names you use)
+*.tfvars
+*.tfvars.json
+
+# Key material and Terraform state (also covered by the root .gitignore)
+*.pem
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*

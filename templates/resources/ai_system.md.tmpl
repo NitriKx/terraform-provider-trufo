@@ -1,0 +1,29 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+subcategory: "AI Systems"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+~> **Warning** Deleting this resource sets the AI system `inactive` — there is no delete endpoint.
+Already-signed content keeps resolving; new signs and embeds using it are rejected.
+
+-> **Note** Registration details (name, version, involvement modes, disclosure) are **immutable** after
+creation: register each new version as a new AI system. The AI system endpoints are served by the
+**production hosts only** (`region = "global"` or `"eu"`).
+
+## Example Usage
+
+{{ tffile "examples/resources/trufo_ai_system/resource.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+This resource can be imported using the AI system ID (`aisys_…`), e.g.
+
+{{codefile "shell" .ImportFile }}

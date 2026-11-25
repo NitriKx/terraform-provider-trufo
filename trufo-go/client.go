@@ -3,19 +3,24 @@ package trufo
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
+	"sync"
 	"time"
 )
 
 const (
 	// DefaultTimeout is the per-request timeout, matching trufo-py's 30s.
 	DefaultTimeout = 30 * time.Second
-	// SDKVersion identifies this client in the X-TF-Go-Version header. The
-	// version headers are self-reported telemetry, not authentication.
-	SDKVersion = "0.1.0"
+	// SDKVersion identifies this client in the X-TF-Version header (same
+	// header name as trufo-py's headers.py). The version headers are
+	// self-reported telemetry, not authentication.
+	SDKVersion = "trufo-go/0.1.0"
 )
 
 // Client is an HTTP client for the Trufo API.
@@ -35,12 +40,17 @@ type Client struct {
 	// AccessToken, when non-empty, is sent as Authorization: Bearer.
 	AccessToken string
 	// RefreshToken is used to obtain a new AccessToken on a 401.
+	// Access via tokens()/SetTokens: the provider shares one Client across
+	// concurrent CRUD calls, and a 401-triggered refresh mutates the pair.
 	RefreshToken string
 	// HTTPClient is the underlying HTTP client; nil uses one with
 	// DefaultTimeout.
 	HTTPClient *http.Client
-	// UserAgent is sent as User-Agent; defaults to "trufo-go/<SDKVersion>".
+	// UserAgent is sent as User-Agent; defaults to SDKVersion.
 	UserAgent string
+
+	// mu guards AccessToken/RefreshToken against concurrent refreshes.
+	mu sync.Mutex
 
 	// OnTokenRefresh, when set, is called after a successful token refresh
 	// so callers can persist the rotated pair.
@@ -58,6 +68,8 @@ func WithTokens(access, refresh string) Option {
 func WithHTTPClient(hc *http.Client) Option { return func(c *Client) { c.HTTPClient = hc } }
 
 // NewClient returns a Client for the given API base URL (default APIURL).
+// The Trufo API requires TLS 1.3+; the default transport enforces it. Plain
+// http:// URLs are only accepted for loopback test servers.
 func NewClient(baseURL string, opts ...Option) *Client {
 	if baseURL == "" {
 		baseURL = APIURL
@@ -66,6 +78,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	for _, opt := range opts {
 		opt(c)
 	}
+	c.BaseURL = strings.TrimRight(c.BaseURL, "/")
 	if c.AuthURL == "" {
 		c.AuthURL = c.BaseURL
 		if c.BaseURL == APIURLTest {
@@ -74,11 +87,24 @@ func NewClient(baseURL string, opts ...Option) *Client {
 			c.AuthURL = APIURL
 		}
 	}
+	c.AuthURL = strings.TrimRight(c.AuthURL, "/")
+	// Validate after options are applied, so WithBaseURL cannot bypass the
+	// plaintext-HTTP guard.
+	for _, u := range []string{c.BaseURL, c.AuthURL} {
+		if p, err := url.Parse(u); err == nil && p.Scheme == "http" && p.Hostname() != "127.0.0.1" && p.Hostname() != "localhost" && p.Hostname() != "::1" {
+			panic("trufo: plaintext HTTP base URL rejected (TLS 1.3+ required): " + u)
+		}
+	}
 	if c.HTTPClient == nil {
-		c.HTTPClient = &http.Client{Timeout: DefaultTimeout}
+		c.HTTPClient = &http.Client{
+			Timeout: DefaultTimeout,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13},
+			},
+		}
 	}
 	if c.UserAgent == "" {
-		c.UserAgent = "trufo-go/" + SDKVersion
+		c.UserAgent = SDKVersion
 	}
 	return c
 }
@@ -97,10 +123,19 @@ func apiKeyScope(key string) string {
 func (c *Client) APIKeyScope() string { return apiKeyScope(c.APIKey) }
 
 // SetTokens replaces the access/refresh token pair (e.g. after a refresh or a
-// login flow).
+// login flow). Safe for concurrent use.
 func (c *Client) SetTokens(access, refresh string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.AccessToken = access
 	c.RefreshToken = refresh
+}
+
+// tokens returns the current access/refresh pair. Safe for concurrent use.
+func (c *Client) tokens() (access, refresh string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.AccessToken, c.RefreshToken
 }
 
 // do performs one HTTP request against the API. method is usually POST; the
@@ -124,9 +159,12 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 	if resp.StatusCode >= 400 {
 		apiErr := parseError(resp.StatusCode, resp.Header.Get("X-Request-ID"), respBody)
 		// Retry once with a refreshed token on 401, like TrufoSession.
-		if resp.StatusCode == http.StatusUnauthorized && c.RefreshToken != "" {
+		_, refresh := c.tokens()
+		if resp.StatusCode == http.StatusUnauthorized && refresh != "" {
 			if refreshErr := c.Refresh(ctx); refreshErr != nil {
-				return apiErr
+				// Surface both: the original 401 and why the refresh failed
+				// (e.g. the refresh token was already rotated/revoked).
+				return fmt.Errorf("%w (token refresh failed: %v)", apiErr, refreshErr)
 			}
 			req2, err := c.newRequest(ctx, c.BaseURL+path, method, body)
 			if err != nil {
@@ -179,10 +217,11 @@ func (c *Client) newRequest(ctx context.Context, url, method string, body any) (
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
-	req.Header.Set("X-TF-Go-Version", SDKVersion)
+	req.Header.Set("X-TF-Version", SDKVersion)
+	access, _ := c.tokens()
 	switch {
-	case c.AccessToken != "":
-		req.Header.Set("Authorization", "Bearer "+c.AccessToken)
+	case access != "":
+		req.Header.Set("Authorization", "Bearer "+access)
 	case c.APIKey != "":
 		req.Header.Set("X-API-Key", c.APIKey)
 	}

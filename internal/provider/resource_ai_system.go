@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -10,13 +11,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/dynamicplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/mistral/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var (
@@ -93,6 +95,8 @@ func (r *aiSystemResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				MarkdownDescription: "Which of `ai_generated` and `ai_modified` the AI system supports (one or both). Changing this forces recreation.",
 				Validators: []validator.List{
 					listvalidator.ValueStringsAre(stringvalidator.OneOf(trufo.AIInvolvementGenerated, trufo.AIInvolvementModified)),
+					listvalidator.SizeAtLeast(1),
+					listvalidator.UniqueValues(),
 				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.RequiresReplace(),
@@ -111,6 +115,9 @@ func (r *aiSystemResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional: true,
 				MarkdownDescription: "A `c2pa.ai-disclosure` body (C2PA 2.4 § 18.28) describing the underlying model, as a dynamic value. " +
 					"Changing this forces recreation.",
+				PlanModifiers: []planmodifier.Dynamic{
+					dynamicplanmodifier.RequiresReplace(),
+				},
 			},
 			"nickname": schema.StringAttribute{
 				Optional:            true,
@@ -172,24 +179,28 @@ func (r *aiSystemResource) Create(ctx context.Context, req resource.CreateReques
 
 	if !plan.Status.IsNull() && !plan.Status.IsUnknown() && plan.Status.ValueString() != trufo.AISystemStatusActive {
 		if _, err := client.SetAISystemStatus(ctx, id, plan.Status.ValueString()); err != nil {
-			resp.Diagnostics.AddError("Failed to set AI system status", err.Error())
+			resp.Diagnostics.AddError("Failed to set AI system status",
+				err.Error()+fmt.Sprintf(" (the AI system %s was registered server-side; import it with: terraform import trufo_ai_system.<name> %s)", id, id))
 			return
 		}
 	} else {
 		plan.Status = types.StringValue(trufo.AISystemStatusActive)
 	}
 
-	stored, err := findAISystem(ctx, client, id)
+	stored, _, err := findAISystem(ctx, client, id)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read AI system after register", err.Error())
+		resp.Diagnostics.AddError("Failed to read AI system after register",
+			err.Error()+fmt.Sprintf(" (the AI system %s was registered server-side; import it with: terraform import trufo_ai_system.<name> %s)", id, id))
+		return
+	}
+	if stored == nil {
+		resp.Diagnostics.AddError(
+			"AI system registered but not yet listed",
+			fmt.Sprintf("The AI system %s was registered server-side but is not yet visible in the list. Rerun apply, or import it with: terraform import trufo_ai_system.<name> %s", id, id),
+		)
 		return
 	}
 	setAISystemState(&plan, stored)
-	// name/version/modes/disclosure are echoed from the list entry when present.
-	if stored != nil {
-		plan.Name = types.StringValue(stored.Name)
-		plan.Version = types.StringValue(stored.Version)
-	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -202,7 +213,7 @@ func (r *aiSystemResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 	client := r.client
 
-	stored, err := findAISystem(ctx, client, state.ID.ValueString())
+	stored, listed, err := findAISystem(ctx, client, state.ID.ValueString())
 	if err != nil {
 		if trufo.Is(err, 404, "") {
 			resp.State.RemoveResource(ctx)
@@ -212,6 +223,18 @@ func (r *aiSystemResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 	if stored == nil {
+		// /ai-system/list returns up to 1000 items, newest first, with no
+		// pagination. If the cap was hit, absence from the list does not
+		// prove deletion — keep the state and warn instead of dropping the
+		// resource.
+		if listed >= 1000 {
+			resp.Diagnostics.AddWarning(
+				"AI system not found in the first 1000 listed",
+				"The list endpoint is capped at 1000 items; keeping the resource in state. If it was deleted out of band, it will disappear on a full refresh.",
+			)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+			return
+		}
 		resp.State.RemoveResource(ctx)
 		return
 	}
@@ -238,7 +261,7 @@ func (r *aiSystemResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 	plan.ID = state.ID
 
-	stored, err := findAISystem(ctx, client, state.ID.ValueString())
+	stored, _, err := findAISystem(ctx, client, state.ID.ValueString())
 	if err != nil || stored == nil {
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to read AI system after update", err.Error())
@@ -280,28 +303,29 @@ func (r *aiSystemResource) ImportState(ctx context.Context, req resource.ImportS
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-// findAISystem lists AI systems and returns the one with the given id, or nil.
-func findAISystem(ctx context.Context, client *trufo.Client, aiSystemID string) (*trufo.AISystem, error) {
+// findAISystem lists AI systems and returns the one with the given id (or
+// nil), plus how many items the list returned (the endpoint caps at 1000).
+func findAISystem(ctx context.Context, client *trufo.Client, aiSystemID string) (*trufo.AISystem, int, error) {
 	systems, err := client.ListAISystems(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	for i := range systems {
 		if systems[i].AISystemID == aiSystemID {
-			return &systems[i], nil
+			return &systems[i], len(systems), nil
 		}
 	}
-	return nil, nil
+	return nil, len(systems), nil
 }
 
 func setAISystemState(m *aiSystemResourceModel, s *trufo.AISystem) {
+	m.Name = types.StringValue(s.Name)
+	m.Version = types.StringValue(s.Version)
 	modes := make([]attr.Value, 0, len(s.AIInvolvementModes))
 	for _, mode := range s.AIInvolvementModes {
 		modes = append(modes, types.StringValue(mode))
 	}
 	m.AIInvolvementModes = types.ListValueMust(types.StringType, modes)
 	m.C2PAFirstPartyAttestable = types.BoolValue(s.C2PAFirstPartyAttestable)
-	if s.Nickname != "" {
-		m.Nickname = types.StringValue(s.Nickname)
-	}
+	m.Nickname = types.StringValue(s.Nickname)
 }

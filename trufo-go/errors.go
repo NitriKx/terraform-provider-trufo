@@ -2,16 +2,18 @@ package trufo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
 
 // FieldError is one entry of a 422 validation error, where detail is a list
-// of {type, loc, msg} objects (FastAPI style).
+// of {type, loc, msg} objects (FastAPI style). Loc elements are strings or
+// integers (list indices), so Loc is []any.
 type FieldError struct {
-	Type string   `json:"type"`
-	Loc  []string `json:"loc"`
-	Msg  string   `json:"msg"`
+	Type string `json:"type"`
+	Loc  []any  `json:"loc"`
+	Msg  string `json:"msg"`
 }
 
 // APIError is the error returned for any non-2xx Trufo API response. Trufo
@@ -44,7 +46,11 @@ func (e *APIError) Error() string {
 	if len(e.FieldErrors) > 0 {
 		parts := make([]string, 0, len(e.FieldErrors))
 		for _, fe := range e.FieldErrors {
-			parts = append(parts, fmt.Sprintf("%s: %s", strings.Join(fe.Loc, "."), fe.Msg))
+			loc := make([]string, 0, len(fe.Loc))
+			for _, l := range fe.Loc {
+				loc = append(loc, fmt.Sprint(l))
+			}
+			parts = append(parts, fmt.Sprintf("%s: %s", strings.Join(loc, "."), fe.Msg))
 		}
 		fmt.Fprintf(&b, ": %s", strings.Join(parts, "; "))
 	}
@@ -54,11 +60,11 @@ func (e *APIError) Error() string {
 	return b.String()
 }
 
-// Is reports whether err is an *APIError with the given status code and, if
-// detail is non-empty, that error code.
+// Is reports whether err is (or wraps) an *APIError with the given status
+// code and, if detail is non-empty, that error code.
 func Is(err error, statusCode int, detail string) bool {
-	ae, ok := err.(*APIError)
-	if !ok || ae.StatusCode != statusCode {
+	var ae *APIError
+	if !errors.As(err, &ae) || ae.StatusCode != statusCode {
 		return false
 	}
 	return detail == "" || ae.Detail == detail

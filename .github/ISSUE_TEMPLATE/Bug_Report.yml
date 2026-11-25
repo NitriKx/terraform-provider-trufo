@@ -1,0 +1,35 @@
+name: Bug Report
+description: Report a bug in the Trufo Terraform provider
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you expect vs. what happened?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Minimal HCL config + commands. Never include API keys or tokens — use placeholders.
+      placeholder: |
+        provider "trufo" { region = "test" }
+        resource "trufo_instance" "x" { gp_id = "gp_..." name = "..." }
+        terraform apply
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: "provider 0.1.0, terraform 1.16.x, OS"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / error output
+      description: Include the X-Request-ID from Trufo API errors if you have one. Redact any secrets.

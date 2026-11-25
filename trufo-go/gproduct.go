@@ -9,9 +9,14 @@ type GProduct struct {
 	GPID               string `json:"gp_id"`
 	OID                string `json:"oid,omitempty"`
 	Name               string `json:"name"`
+	TP                 string `json:"tp,omitempty"`
 	Implementation     string `json:"implementation,omitempty"`
 	PVStatus           string `json:"pv_status,omitempty"`
+	PVProductName      string `json:"pv_product_name,omitempty"`
+	PVAssuranceLevel   string `json:"pv_assurance_level,omitempty"`
 	PVActive           bool   `json:"pv_active,omitempty"`
+	Branded            bool   `json:"branded,omitempty"`
+	BPVStatus          string `json:"bpv_status,omitempty"`
 	ValidatedExpiresAt string `json:"validated_expires_at,omitempty"`
 	CancelAt           string `json:"cancel_at,omitempty"`
 	CreatedBy          string `json:"created_by,omitempty"`

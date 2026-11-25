@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -10,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/mistral/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var _ resource.Resource = (*instanceResource)(nil)
@@ -53,7 +54,9 @@ func (r *instanceResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A Trufo generator product **instance** — one signing identity within a generator product " +
 			"(`POST /gproduct/instance/*`). Instances hold their own credentials and are issued their own certificates. " +
-			"Requires an active Product Validation on the product.",
+			"Requires an active Product Validation on the product. Auth: an MFA-verified access token " +
+			"(`access_token`/`refresh_token`). On the test host, a `gproduct-admin` scoped API key is also accepted " +
+			"(verified against test.api.trufo.ai; the scope is not listed in the trufo-py docs).",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -120,17 +123,15 @@ func (r *instanceResource) Create(ctx context.Context, req resource.CreateReques
 	}
 	plan.ID = types.StringValue(gpiID)
 
+	// Create-then-read: if this read fails, no state is saved and the
+	// server-side instance would be orphaned (the next apply would create a
+	// duplicate). Import the orphan with `terraform import` by its gpi_id.
 	inst, err := client.GetInstance(ctx, gpiID)
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to read instance after create", err.Error())
+		resp.Diagnostics.AddError("Failed to read instance after create", err.Error()+fmt.Sprintf(" (the instance %s was created server-side; import it with: terraform import trufo_instance.<name> %s)", gpiID, gpiID))
 		return
 	}
-	plan.GPID = types.StringValue(inst.GPID)
-	plan.Name = types.StringValue(inst.Name)
-	plan.OID = types.StringValue(inst.OID)
-	plan.RecordID = types.StringValue(inst.RecordID)
-	plan.CreatedBy = types.StringValue(inst.CreatedBy)
-	plan.CreatedAt = types.StringValue(inst.CreatedAt)
+	setInstanceState(&plan, inst)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -153,14 +154,25 @@ func (r *instanceResource) Read(ctx context.Context, req resource.ReadRequest, r
 		resp.Diagnostics.AddError("Failed to read instance", err.Error())
 		return
 	}
-	state.GPID = types.StringValue(inst.GPID)
-	state.Name = types.StringValue(inst.Name)
-	state.OID = types.StringValue(inst.OID)
-	state.RecordID = types.StringValue(inst.RecordID)
-	state.CreatedBy = types.StringValue(inst.CreatedBy)
-	state.CreatedAt = types.StringValue(inst.CreatedAt)
+	setInstanceState(&state, inst)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+// setInstanceState copies API fields into the model, keeping the existing
+// value when the API omits a field (Required fields like gp_id/name must never
+// be overwritten with empty strings).
+func setInstanceState(m *instanceResourceModel, inst *trufo.Instance) {
+	if inst.GPID != "" {
+		m.GPID = types.StringValue(inst.GPID)
+	}
+	if inst.Name != "" {
+		m.Name = types.StringValue(inst.Name)
+	}
+	m.OID = types.StringValue(inst.OID)
+	m.RecordID = types.StringValue(inst.RecordID)
+	m.CreatedBy = types.StringValue(inst.CreatedBy)
+	m.CreatedAt = types.StringValue(inst.CreatedAt)
 }
 
 func (r *instanceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -186,11 +198,7 @@ func (r *instanceResource) Update(ctx context.Context, req resource.UpdateReques
 		resp.Diagnostics.AddError("Failed to read instance after update", err.Error())
 		return
 	}
-	plan.Name = types.StringValue(inst.Name)
-	plan.OID = types.StringValue(inst.OID)
-	plan.RecordID = types.StringValue(inst.RecordID)
-	plan.CreatedBy = types.StringValue(inst.CreatedBy)
-	plan.CreatedAt = types.StringValue(inst.CreatedAt)
+	setInstanceState(&plan, inst)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }

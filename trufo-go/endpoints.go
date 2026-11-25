@@ -7,17 +7,27 @@
 // enrollment) are intentionally out of scope.
 package trufo
 
+import "os"
+
 // API hosts.
 const (
 	APIURL       = "https://api.trufo.ai"
 	APIURLEurope = "https://eu.api.trufo.ai"
 	APIURLTest   = "https://test.api.trufo.ai"
-	AppURL       = "https://app.trufo.ai"
 	CAURL        = "https://ca.trufo.ai"
 	CAURLTest    = "https://test.ca.trufo.ai"
 	OCSPURL      = "https://ocsp.trufo.ai"
 	TSAURL       = "https://tsa.trufo.ai"
 )
+
+// AppURL is the webapp origin the loopback login sends the browser to. Like
+// trufo-py's TRUFO_APP_URL, it can be overridden via the environment.
+var AppURL = func() string {
+	if v := os.Getenv("TRUFO_APP_URL"); v != "" {
+		return v
+	}
+	return "https://app.trufo.ai"
+}()
 
 // Account / auth endpoints (RFC 8628 device flow, RFC 8252 loopback flow).
 const (

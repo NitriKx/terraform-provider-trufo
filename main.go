@@ -8,8 +8,11 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/mistral/terraform-trufo-ai-provider/internal/provider"
+	"github.com/NitriKx/terraform-provider-trufo/internal/provider"
 )
+
+// version is set by goreleaser via -ldflags "-X main.version=...".
+var version = "dev"
 
 func main() {
 	var debug bool
@@ -17,11 +20,11 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/mistral/trufo",
+		Address: "registry.terraform.io/nitrikx/trufo",
 		Debug:   debug,
 	}
 
-	if err := providerserver.Serve(context.Background(), provider.New("dev"), opts); err != nil {
+	if err := providerserver.Serve(context.Background(), provider.New(version), opts); err != nil {
 		log.Fatal(err.Error())
 	}
 }

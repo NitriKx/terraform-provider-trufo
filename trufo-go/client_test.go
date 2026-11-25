@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -94,8 +95,11 @@ func TestFieldErrors422(t *testing.T) {
 	if !errors.As(err, &ae) {
 		t.Fatalf("expected *APIError, got %T: %v", err, err)
 	}
-	if len(ae.FieldErrors) != 2 || ae.FieldErrors[0].Loc[1] != "gp_id" || ae.FieldErrors[0].Msg != "Field required" {
+	if len(ae.FieldErrors) != 2 || fmt.Sprint(ae.FieldErrors[0].Loc[1]) != "gp_id" || ae.FieldErrors[0].Msg != "Field required" {
 		t.Errorf("unexpected field errors: %+v", ae.FieldErrors)
+	}
+	if !Is(err, 422, "") {
+		t.Error("Is() should match 422 with any detail")
 	}
 }
 
