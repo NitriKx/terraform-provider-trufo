@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/NitriKx/terraform-provider-trufo/compare/v1.0.0...v1.0.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **release:** name the checksums file SHA256SUMS as the Terraform Registry requires ([552abe2](https://github.com/NitriKx/terraform-provider-trufo/commit/552abe28bc41e3ddd680cf3ca806de70e8e378ed))
+
 ## 1.0.0 (2026-11-25)
 
 
