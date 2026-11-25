@@ -91,7 +91,7 @@ go build ./...                 # build provider + client
 go test ./...                  # unit tests (client uses a mock server)
 TF_ACC=1 TRUFO_API_KEY=... TRUFO_TEST_GP_ID=gp_... go test ./internal/provider/ -run TestAcc -v
                                # acceptance tests against test.api.trufo.ai
-go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs   # regenerate docs/
+go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name trufo-ai   # regenerate docs/
 ```
 
 Acceptance tests run against `https://test.api.trufo.ai` (override with `TRUFO_TEST_API_URL`; AI system tests
