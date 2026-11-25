@@ -29,7 +29,30 @@ Every Trufo API request carries exactly one credential, and so does the provider
   data sources. If only a `trufo-api`-scoped `api_key` is configured, the provider runs the interactive login
   (loopback browser flow, or device flow — see `auth_flow`) at configure time.
 
-Region/host: `region = "global" | "eu" | "test"` or `api_url`, plus `TRUFO_API_URL`.
+## Regions and hosts
+
+The provider defaults to the **global production API** (`https://api.trufo.ai`). Other hosts via `region` or a
+full `api_url` (or the `TRUFO_API_URL` env var):
+
+| Host | `region` | Use |
+| --- | --- | --- |
+| `https://api.trufo.ai` | `global` (default) | Production, global |
+| `https://eu.api.trufo.ai` | `eu` | Production, EU — media submitted there is processed and stored in EU infrastructure |
+| `https://test.api.trufo.ai` | `test` | Test API — certificate test flow and test-scoped keys; nothing carries over to production |
+
+```hcl
+provider "trufo" {} # production, global (default)
+
+provider "trufo" {
+  alias  = "eu"
+  region = "eu"
+}
+
+provider "trufo" {
+  alias  = "test"
+  region = "test"
+}
+```
 
 ```hcl
 terraform {
@@ -71,14 +94,14 @@ TF_ACC=1 TRUFO_API_KEY=... TRUFO_TEST_GP_ID=gp_... go test ./internal/provider/ 
 go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs   # regenerate docs/
 ```
 
-Acceptance tests run against `https://test.api.trufo.ai` (override with `TRUFO_TEST_API_URL`) and need:
+Acceptance tests run against `https://test.api.trufo.ai` (override with `TRUFO_TEST_API_URL`; AI system tests
+use `https://api.trufo.ai`, override with `TRUFO_PROD_API_URL`) and need:
 
 - `TRUFO_API_KEY` — a `gproduct-admin` scoped key (instances/credentials work with it on the test host)
+- `TRUFO_ACCESS_TOKEN` + `TRUFO_REFRESH_TOKEN` — a Bearer token pair, e.g. minted via the device flow with a
+  `trufo-api` scoped key (`trufo login --device` with the Python SDK); covers the product/certificate data
+  sources and the AI system endpoints
 - `TRUFO_TEST_GP_ID` — a test generator product created in the dashboard's Test view
-
-The `trufo_ai_system` resource and the `trufo_generator_product`/`trufo_certificates` data sources need
-production hosts and a `c2pa-sign-*`/`watermark-*` key or a Bearer token, so they are covered by unit tests
-only.
 
 ## License
 

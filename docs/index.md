@@ -11,6 +11,31 @@ The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance
 The API client used by the provider is [`github.com/mistral/trufo-go`](./trufo-go), a Go port of the official
 [Python SDK](https://github.com/trufo-ai/trufo-py).
 
+## Regions and hosts
+
+The provider defaults to the **global production API** (`https://api.trufo.ai`). Pick another host with `region`
+or a full `api_url` (or the `TRUFO_API_URL` environment variable):
+
+| Host | `region` | Use |
+| --- | --- | --- |
+| `https://api.trufo.ai` | `global` (default) | Production, global |
+| `https://eu.api.trufo.ai` | `eu` | Production, EU — media submitted there is processed and stored in EU infrastructure |
+| `https://test.api.trufo.ai` | `test` | Test API — certificate test flow and test-scoped keys; nothing carries over to production |
+
+```terraform
+provider "trufo" {} # production, global (default)
+
+provider "trufo" {
+  alias  = "eu"
+  region = "eu"
+}
+
+provider "trufo" {
+  alias  = "test"
+  region = "test"
+}
+```
+
 ## Authentication
 
 Every API request carries exactly one credential. The provider supports both, like the Python SDK:
@@ -26,27 +51,48 @@ Every API request carries exactly one credential. The provider supports both, li
 ## Example usage
 
 ```terraform
-# API-key auth against the test host (X-API-Key). The key comes from the
-# TRUFO_API_KEY environment variable — never hardcode it.
+terraform {
+  required_providers {
+    trufo = {
+      source = "mistral/trufo"
+    }
+  }
+}
+
+# Default: the global PRODUCTION API, https://api.trufo.ai.
+# Credentials come from the environment — never hardcode them:
+#   TRUFO_API_KEY                    API key (X-API-Key: {scope}:{key})
+#   TRUFO_ACCESS_TOKEN + TRUFO_REFRESH_TOKEN   Bearer token pair
+#   TRUFO_API_URL                   overrides the host
+provider "trufo" {}
+
+# EU production API (https://eu.api.trufo.ai): media submitted there is
+# processed and stored in EU infrastructure.
 provider "trufo" {
+  alias  = "eu"
+  region = "eu"
+}
+
+# Test API (https://test.api.trufo.ai): certificate test flow and test-scoped
+# keys (e.g. c2pa-sign-test, gproduct-admin on the test host).
+provider "trufo" {
+  alias  = "test"
   region = "test"
 }
 
-# Bearer auth with a pre-obtained token pair (TRUFO_ACCESS_TOKEN /
-# TRUFO_REFRESH_TOKEN), required for /gproduct/list and /cert/list:
+# A dedicated host, if your organization was provisioned one:
 #
 # provider "trufo" {
-#   region        = "global"
-#   access_token  = var.trufo_access_token
-#   refresh_token = var.trufo_refresh_token
+#   alias   = "dedicated"
+#   api_url = "https://your-host.api.trufo.ai"
 # }
 
 # A trufo-api scoped API key without tokens triggers the interactive login
 # (loopback browser flow, falling back to the device flow):
 #
 # provider "trufo" {
-#   api_key  = var.trufo_api_key # trufo-api:...
-#   auth_flow = "auto"           # auto | loopback | device | none
+#   api_key   = var.trufo_api_key # trufo-api:...
+#   auth_flow = "auto"            # auto | loopback | device | none
 # }
 ```
 
@@ -57,9 +103,9 @@ provider "trufo" {
 
 - `access_token` (String, Sensitive) Access token (Bearer auth), e.g. obtained via the device flow. Default: the `TRUFO_ACCESS_TOKEN` environment variable. Requires `refresh_token`.
 - `api_key` (String, Sensitive) Trufo API key in `{scope}:{key}` form, sent as `X-API-Key`. Default: the `TRUFO_API_KEY` environment variable. A key with the `trufo-api` scope is used to run the interactive login flow (see `auth_flow`) when no tokens are configured.
-- `api_url` (String) Trufo API base URL, e.g. `https://api.trufo.ai`. Overrides `region`. Default: `https://api.trufo.ai`, or the `TRUFO_API_URL` environment variable.
+- `api_url` (String) Trufo API base URL, e.g. `https://api.trufo.ai` (production), `https://eu.api.trufo.ai` (EU production) or `https://test.api.trufo.ai` (test). Overrides `region`; use it for dedicated hosts. Default: `https://api.trufo.ai` (production), or the `TRUFO_API_URL` environment variable.
 - `auth_flow` (String) How to obtain access/refresh tokens when only a `trufo-api`-scoped `api_key` is set: `auto` (loopback browser flow, falling back to the device flow), `loopback` (browser on this machine), `device` (prints a verification URL and code) or `none` (use the API key directly). Default: `auto`.
 - `refresh_token` (String, Sensitive) Refresh token, rotated on every use; the provider refreshes the access token automatically on 401. Default: the `TRUFO_REFRESH_TOKEN` environment variable. Requires `access_token`.
-- `region` (String) Content region: `global` (`https://api.trufo.ai`), `eu` (`https://eu.api.trufo.ai`) or `test` (`https://test.api.trufo.ai`). Ignored when `api_url` is set. Default: `global`.
+- `region` (String) Content region: `global` (`https://api.trufo.ai`, **default**), `eu` (`https://eu.api.trufo.ai`, EU production — media submitted there is processed and stored in EU infrastructure) or `test` (`https://test.api.trufo.ai`, test API with test-scoped keys; nothing carries over to production). Ignored when `api_url` is set.
 
 

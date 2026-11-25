@@ -70,13 +70,15 @@ func (p *trufoProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp
 			"All endpoints are authenticated with exactly one credential: an API key (`X-API-Key`) or an access token (`Bearer`).",
 		Attributes: map[string]schema.Attribute{
 			"api_url": schema.StringAttribute{
-				MarkdownDescription: "Trufo API base URL, e.g. `https://api.trufo.ai`. Overrides `region`. " +
-					"Default: `https://api.trufo.ai`, or the `" + envAPIURL + "` environment variable.",
+				MarkdownDescription: "Trufo API base URL, e.g. `https://api.trufo.ai` (production), `https://eu.api.trufo.ai` (EU production) " +
+					"or `https://test.api.trufo.ai` (test). Overrides `region`; use it for dedicated hosts. " +
+					"Default: `https://api.trufo.ai` (production), or the `" + envAPIURL + "` environment variable.",
 				Optional: true,
 			},
 			"region": schema.StringAttribute{
-				MarkdownDescription: "Content region: `global` (`https://api.trufo.ai`), `eu` (`https://eu.api.trufo.ai`) " +
-					"or `test` (`https://test.api.trufo.ai`). Ignored when `api_url` is set. Default: `global`.",
+				MarkdownDescription: "Content region: `global` (`https://api.trufo.ai`, **default**), `eu` (`https://eu.api.trufo.ai`, EU production — media submitted there is processed and stored in EU infrastructure) " +
+					"or `test` (`https://test.api.trufo.ai`, test API with test-scoped keys; nothing carries over to production). " +
+					"Ignored when `api_url` is set.",
 				Optional: true,
 			},
 			"api_key": schema.StringAttribute{
@@ -123,18 +125,10 @@ func (p *trufoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	refreshToken := stringFromEnv(cfg.RefreshToken, envRefreshToken)
 	authFlow := stringFromEnv(cfg.AuthFlow, "")
 
-	if apiURL == "" {
-		switch region {
-		case "", regionGlobal:
-			apiURL = trufo.APIURL
-		case regionEU:
-			apiURL = trufo.APIURLEurope
-		case regionTest:
-			apiURL = trufo.APIURLTest
-		default:
-			resp.Diagnostics.AddError("Invalid region", fmt.Sprintf("region must be one of %q, %q, %q; got %q", regionGlobal, regionEU, regionTest, region))
-			return
-		}
+	apiURL, err := resolveAPIURL(apiURL, region)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid region", err.Error())
+		return
 	}
 	if (accessToken == "") != (refreshToken == "") {
 		resp.Diagnostics.AddError(
@@ -207,6 +201,24 @@ func (p *trufoProvider) Resources(_ context.Context) []func() resource.Resource 
 		NewInstanceResource,
 		NewInstanceCredentialResource,
 		NewAISystemResource,
+	}
+}
+
+// resolveAPIURL maps the api_url/region configuration to an API host. With
+// neither set, the production global API is the default.
+func resolveAPIURL(apiURL, region string) (string, error) {
+	if apiURL != "" {
+		return apiURL, nil
+	}
+	switch region {
+	case "", regionGlobal:
+		return trufo.APIURL, nil
+	case regionEU:
+		return trufo.APIURLEurope, nil
+	case regionTest:
+		return trufo.APIURLTest, nil
+	default:
+		return "", fmt.Errorf("region must be one of %q, %q, %q; got %q", regionGlobal, regionEU, regionTest, region)
 	}
 }
 

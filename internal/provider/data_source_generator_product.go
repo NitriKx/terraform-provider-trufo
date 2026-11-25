@@ -108,38 +108,47 @@ func (d *generatorProductDataSource) Read(ctx context.Context, req datasource.Re
 	}
 	client := d.client
 
-	var gp *trufo.GProduct
+	// The list endpoint carries the PV status fields; the info endpoint
+	// carries oid/created_by/created_at. Merge both.
+	oid := cfg.OID.ValueString()
+	gps, err := client.ListGProducts(ctx, oid)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to list generator products", err.Error())
+		return
+	}
+	var listed *trufo.GProduct
 	if !cfg.GPID.IsNull() && cfg.GPID.ValueString() != "" {
-		g, err := client.GetGProduct(ctx, cfg.GPID.ValueString())
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to read generator product", err.Error())
-			return
-		}
-		gp = g
-	} else if !cfg.Name.IsNull() && cfg.Name.ValueString() != "" {
-		oid := cfg.OID.ValueString()
-		gps, err := client.ListGProducts(ctx, oid)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed to list generator products", err.Error())
-			return
-		}
 		for i := range gps {
-			if gps[i].Name == cfg.Name.ValueString() {
-				gp = &gps[i]
+			if gps[i].GPID == cfg.GPID.ValueString() {
+				listed = &gps[i]
 				break
 			}
 		}
-		if gp == nil {
-			resp.Diagnostics.AddError("Generator product not found", fmt.Sprintf("No generator product named %q.", cfg.Name.ValueString()))
-			return
-		}
-		// Enrich with the info endpoint when available.
-		if info, err := client.GetGProduct(ctx, gp.GPID); err == nil {
-			gp = info
+	} else if !cfg.Name.IsNull() && cfg.Name.ValueString() != "" {
+		for i := range gps {
+			if gps[i].Name == cfg.Name.ValueString() {
+				listed = &gps[i]
+				break
+			}
 		}
 	} else {
 		resp.Diagnostics.AddError("Missing lookup key", "Set exactly one of gp_id or name.")
 		return
+	}
+	if listed == nil {
+		resp.Diagnostics.AddError("Generator product not found",
+			fmt.Sprintf("No generator product matching gp_id=%q name=%q in the list.", cfg.GPID.ValueString(), cfg.Name.ValueString()))
+		return
+	}
+	gp := *listed
+	if info, err := client.GetGProduct(ctx, gp.GPID); err == nil {
+		// info wins for the fields it actually returns
+		gp.OID = info.OID
+		gp.CreatedBy = info.CreatedBy
+		gp.CreatedAt = info.CreatedAt
+		if info.Name != "" {
+			gp.Name = info.Name
+		}
 	}
 
 	cfg.ID = types.StringValue(gp.GPID)

@@ -185,11 +185,6 @@ func (r *aiSystemResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 	setAISystemState(&plan, stored)
-	// name/version/modes/disclosure are echoed from the list entry when present.
-	if stored != nil {
-		plan.Name = types.StringValue(stored.Name)
-		plan.Version = types.StringValue(stored.Version)
-	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -295,13 +290,13 @@ func findAISystem(ctx context.Context, client *trufo.Client, aiSystemID string) 
 }
 
 func setAISystemState(m *aiSystemResourceModel, s *trufo.AISystem) {
+	m.Name = types.StringValue(s.Name)
+	m.Version = types.StringValue(s.Version)
 	modes := make([]attr.Value, 0, len(s.AIInvolvementModes))
 	for _, mode := range s.AIInvolvementModes {
 		modes = append(modes, types.StringValue(mode))
 	}
 	m.AIInvolvementModes = types.ListValueMust(types.StringType, modes)
 	m.C2PAFirstPartyAttestable = types.BoolValue(s.C2PAFirstPartyAttestable)
-	if s.Nickname != "" {
-		m.Nickname = types.StringValue(s.Nickname)
-	}
+	m.Nickname = types.StringValue(s.Nickname)
 }

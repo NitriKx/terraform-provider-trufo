@@ -11,6 +11,31 @@ The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance
 The API client used by the provider is [`github.com/mistral/trufo-go`](./trufo-go), a Go port of the official
 [Python SDK](https://github.com/trufo-ai/trufo-py).
 
+## Regions and hosts
+
+The provider defaults to the **global production API** (`https://api.trufo.ai`). Pick another host with `region`
+or a full `api_url` (or the `TRUFO_API_URL` environment variable):
+
+| Host | `region` | Use |
+| --- | --- | --- |
+| `https://api.trufo.ai` | `global` (default) | Production, global |
+| `https://eu.api.trufo.ai` | `eu` | Production, EU — media submitted there is processed and stored in EU infrastructure |
+| `https://test.api.trufo.ai` | `test` | Test API — certificate test flow and test-scoped keys; nothing carries over to production |
+
+```terraform
+provider "trufo" {} # production, global (default)
+
+provider "trufo" {
+  alias  = "eu"
+  region = "eu"
+}
+
+provider "trufo" {
+  alias  = "test"
+  region = "test"
+}
+```
+
 ## Authentication
 
 Every API request carries exactly one credential. The provider supports both, like the Python SDK:
