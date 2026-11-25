@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Trufo platform / account questions (API keys, Organization Validation, plans)
+    url: mailto:support@trufo.ai
+    about: Contact Trufo support. GitHub issues here are only for provider bug reports and feature requests.
+  - name: Terraform usage questions
+    url: https://discuss.hashicorp.com/c/terraform-core
+    about: Please ask Terraform language/workflow questions in the HashiCorp Discuss Terraform Core section.

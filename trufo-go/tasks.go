@@ -1,6 +1,9 @@
 package trufo
 
-import "context"
+import (
+	"context"
+	"net/url"
+)
 
 // Task is the status of an async operation (the only GET endpoint:
 // GET /tasks/{task_id}).
@@ -25,7 +28,7 @@ type Task struct {
 // GetTask calls GET /tasks/{task_id}.
 func (c *Client) GetTask(ctx context.Context, taskID string) (*Task, error) {
 	var out Task
-	if err := c.get(ctx, TasksPath+taskID, &out); err != nil {
+	if err := c.get(ctx, TasksPath+url.PathEscape(taskID), &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

@@ -1,0 +1,19 @@
+name: Feature Request
+description: Suggest a feature or new resource for the Trufo provider
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What Trufo API capability is missing from the provider?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Sketch the HCL you would write (resource/data source name, attributes).
+    validations:
+      required: true

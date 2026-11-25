@@ -207,6 +207,18 @@ func (r *aiSystemResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 	if stored == nil {
+		// /ai-system/list returns up to 1000 items, newest first, with no
+		// pagination. If the cap was hit, absence from the list does not
+		// prove deletion — keep the state and warn instead of dropping the
+		// resource.
+		if systems, lerr := client.ListAISystems(ctx); lerr == nil && len(systems) >= 1000 {
+			resp.Diagnostics.AddWarning(
+				"AI system not found in the first 1000 listed",
+				"The list endpoint is capped at 1000 items; keeping the resource in state. If it was deleted out of band, it will disappear on a full refresh.",
+			)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+			return
+		}
 		resp.State.RemoveResource(ctx)
 		return
 	}

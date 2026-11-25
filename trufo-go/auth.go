@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -15,8 +16,14 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"sync"
 	"time"
 )
+
+// ErrNoBrowser signals that the loopback flow cannot run because no local
+// browser could be launched or no loopback port could be bound (the headless
+// signal, as in trufo-py). Callers should fall back to the device flow.
+var ErrNoBrowser = errors.New("no local browser available")
 
 // TokenPair holds an access + refresh token pair.
 type TokenPair struct {
@@ -63,7 +70,7 @@ func (c *Client) PollDeviceToken(ctx context.Context, deviceCode string) (*Token
 		if errors.As(err, &ae) && ae.StatusCode == 400 && ae.Detail == "access_denied" {
 			return nil, errors.New("authorization was denied by the user")
 		}
-		if errors.As(err, &ae) && ae.StatusCode == 400 && ae.Detail == "expired_token" {
+		if errors.As(err, &ae) && ae.StatusCode == 400 && (ae.Detail == "expired_token" || ae.Detail == "DeviceCodeNotFound") {
 			return nil, errors.New("device code expired; please try again")
 		}
 		return nil, fmt.Errorf("device token poll failed: %w", err)
@@ -181,6 +188,7 @@ func (c *Client) postWithAPIKey(ctx context.Context, url string, body, out any) 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.UserAgent)
+	req.Header.Set("X-TF-Go-Version", SDKVersion)
 	req.Header.Set("X-API-Key", c.APIKey)
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
@@ -228,18 +236,19 @@ func (c *Client) LoopbackLogin(ctx context.Context, appURL string, timeout time.
 	// would expose the callback — and the authorization code — to the network.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, fmt.Errorf("binding loopback listener: %w", err)
+		return nil, fmt.Errorf("%w: binding loopback listener: %v", ErrNoBrowser, err)
 	}
 	defer ln.Close()
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d/callback", ln.Addr().(*net.TCPAddr).Port)
 
 	q := url.Values{}
 	q.Set("code_challenge", challenge)
+	q.Set("code_challenge_method", "S256")
 	q.Set("state", state)
 	q.Set("redirect_uri", redirectURI)
 	authorizeURL := appURL + LoopbackAuthPath + "?" + q.Encode()
 	if !openBrowser(authorizeURL) {
-		return nil, errors.New("no local browser available; use the device flow instead")
+		return nil, fmt.Errorf("%w; use the device flow instead", ErrNoBrowser)
 	}
 
 	type callbackResult struct {
@@ -247,14 +256,18 @@ func (c *Client) LoopbackLogin(ctx context.Context, appURL string, timeout time.
 		state string
 	}
 	resCh := make(chan callbackResult, 1)
+	var once sync.Once
 	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/callback" {
+		if r.Method != http.MethodGet || r.URL.Path != "/callback" {
 			// Ignore anything that is not our callback (a favicon prefetch,
-			// a port scanner) so it cannot consume the one-shot listener.
+			// a port scanner, a second callback) so it cannot consume the
+			// one-shot listener.
 			http.NotFound(w, r)
 			return
 		}
-		resCh <- callbackResult{code: r.URL.Query().Get("code"), state: r.URL.Query().Get("state")}
+		once.Do(func() {
+			resCh <- callbackResult{code: r.URL.Query().Get("code"), state: r.URL.Query().Get("state")}
+		})
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, "<html><body style='font-family:sans-serif;text-align:center;padding:60px'><h2>Signed in</h2><p>You can close this window and return to your terminal.</p></body></html>")
 	})}
@@ -272,7 +285,9 @@ func (c *Client) LoopbackLogin(ctx context.Context, appURL string, timeout time.
 	if res.code == "" {
 		return nil, errors.New("sign-in callback arrived without an authorization code")
 	}
-	if res.state != state {
+	// Constant-time comparison: the state check stops a third party from
+	// feeding us a code that belongs to a flow we did not start.
+	if subtle.ConstantTimeCompare([]byte(res.state), []byte(state)) != 1 {
 		return nil, errors.New("state mismatch on loopback callback; sign-in aborted")
 	}
 

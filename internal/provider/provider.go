@@ -4,8 +4,11 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -17,13 +20,61 @@ import (
 )
 
 // Env vars, mirroring the trufo-py SDK (TRUFO_API_KEY, TRUFO_ACCESS_TOKEN,
-// TRUFO_REFRESH_TOKEN) plus TRUFO_API_URL for the host.
+// TRUFO_REFRESH_TOKEN) plus TRUFO_API_URL for the host and TRUFO_APP_URL for
+// the webapp origin used by the loopback login.
 const (
 	envAPIURL       = "TRUFO_API_URL"
 	envAPIKey       = "TRUFO_API_KEY"
 	envAccessToken  = "TRUFO_ACCESS_TOKEN"
 	envRefreshToken = "TRUFO_REFRESH_TOKEN"
+	envAppURL       = "TRUFO_APP_URL"
 )
+
+// sessionFile mirrors the trufo-py CLI's session store (~/.trufo/session,
+// 0600): the rotated access/refresh token pair is persisted there after
+// every refresh, because refresh tokens are single-use.
+func sessionFile() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".trufo", "session")
+}
+
+// loadSessionFile reads a persisted token pair, like trufo-py's load_session
+// file fallback.
+func loadSessionFile() (access, refresh string, err error) {
+	path := sessionFile()
+	if path == "" {
+		return "", "", errors.New("no home directory")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", err
+	}
+	var pair trufo.TokenPair
+	if err := json.Unmarshal(b, &pair); err != nil {
+		return "", "", fmt.Errorf("corrupt session file %s: %w", path, err)
+	}
+	return pair.AccessToken, pair.RefreshToken, nil
+}
+
+// saveSessionFile persists a token pair with 0600, like trufo-py's
+// save_session.
+func saveSessionFile(access, refresh string) error {
+	path := sessionFile()
+	if path == "" {
+		return errors.New("no home directory")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	b, err := json.Marshal(trufo.TokenPair{AccessToken: access, RefreshToken: refresh})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(b, '\n'), 0o600)
+}
 
 // Regions map to API hosts. api_url overrides region.
 const (
@@ -117,12 +168,17 @@ func (p *trufoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		return
 	}
 
-	// Resolve with env-var fallbacks.
+	// Resolve with env-var fallbacks, then the trufo-py session file.
 	apiURL := stringFromEnv(cfg.APIBaseURL, envAPIURL)
 	region := stringFromEnv(cfg.Region, "")
 	apiKey := stringFromEnv(cfg.APIKey, envAPIKey)
 	accessToken := stringFromEnv(cfg.AccessToken, envAccessToken)
 	refreshToken := stringFromEnv(cfg.RefreshToken, envRefreshToken)
+	if accessToken == "" && refreshToken == "" {
+		if a, r, err := loadSessionFile(); err == nil {
+			accessToken, refreshToken = a, r
+		}
+	}
 	authFlow := stringFromEnv(cfg.AuthFlow, "")
 
 	apiURL, err := resolveAPIURL(apiURL, region)
@@ -140,9 +196,15 @@ func (p *trufoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	if apiKey == "" && accessToken == "" {
 		resp.Diagnostics.AddError(
 			"No credentials configured",
-			fmt.Sprintf("Set api_key (or %s), or access_token + refresh_token (or %s / %s).", envAPIKey, envAccessToken, envRefreshToken),
+			fmt.Sprintf("Set api_key (or %s), or access_token + refresh_token (or %s / %s, or a %s session file).", envAPIKey, envAccessToken, envRefreshToken, sessionFile()),
 		)
 		return
+	}
+	if apiKey != "" && accessToken != "" {
+		resp.Diagnostics.AddWarning(
+			"Both api_key and access_token configured",
+			"Requests use the Bearer access token; the API key is only used to start the login flow. Set only one.",
+		)
 	}
 	if authFlow == "" {
 		authFlow = "auto"
@@ -156,16 +218,21 @@ func (p *trufoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 
 	client := trufo.NewClient(apiURL, trufo.WithAPIKey(apiKey))
 	client.SetTokens(accessToken, refreshToken)
+	// Persist every rotated token pair (refresh tokens are single-use), like
+	// the trufo-py CLI's save_session.
+	client.OnTokenRefresh = func(access, refresh string) {
+		if err := saveSessionFile(access, refresh); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not persist refreshed Trufo session to %s: %v\n", sessionFile(), err)
+		}
+	}
 
 	// A trufo-api-scoped key without tokens starts the interactive login flow
 	// so that Bearer-only endpoints (gproduct list/info, cert list) work too.
 	if accessToken == "" && apiKey != "" && client.APIKeyScope() == "trufo-api" && authFlow != "none" {
-		tokens, err := runLoginFlow(ctx, client, authFlow)
-		if err != nil {
+		if _, err := runLoginFlow(ctx, client, authFlow); err != nil {
 			resp.Diagnostics.AddError("Trufo login failed", err.Error())
 			return
 		}
-		_ = tokens
 	}
 
 	resp.DataSourceData = client
@@ -173,20 +240,33 @@ func (p *trufoProvider) Configure(ctx context.Context, req provider.ConfigureReq
 }
 
 // runLoginFlow runs the loopback or device flow, printing the verification
-// URL when the device flow is used.
+// URL when the device flow is used. authFlow "auto" tries the loopback
+// browser flow first and falls back to the device flow only when no local
+// browser/listener is available (the headless signal), like trufo-py.
 func runLoginFlow(ctx context.Context, client *trufo.Client, authFlow string) (*trufo.TokenPair, error) {
-	if authFlow == "device" || authFlow == "auto" {
-		// Try loopback first for auto; device flow always works headless.
-		if authFlow == "auto" {
-			if tokens, err := client.LoopbackLogin(ctx, trufo.AppURL, 0); err == nil {
-				return tokens, nil
-			}
-		}
-		return client.DeviceFlow(ctx, func(verificationURI, userCode string) {
-			fmt.Fprintf(os.Stderr, "\nTrufo sign-in required.\nVisit: %s\nConfirm code: %s\n\n", verificationURI, userCode)
-		})
+	appURL := os.Getenv(envAppURL)
+	if appURL == "" {
+		appURL = trufo.AppURL
 	}
-	return client.LoopbackLogin(ctx, trufo.AppURL, 0)
+	devicePrompt := func(verificationURI, userCode string) {
+		fmt.Fprintf(os.Stderr, "\nTrufo sign-in required.\nVisit: %s\nConfirm code: %s\n\n", verificationURI, userCode)
+	}
+	switch authFlow {
+	case "loopback":
+		return client.LoopbackLogin(ctx, appURL, 0)
+	case "device":
+		return client.DeviceFlow(ctx, devicePrompt)
+	default: // auto
+		tokens, err := client.LoopbackLogin(ctx, appURL, 0)
+		if err == nil {
+			return tokens, nil
+		}
+		if !errors.Is(err, trufo.ErrNoBrowser) {
+			return nil, err
+		}
+		fmt.Fprintln(os.Stderr, "No local browser available; falling back to device sign-in.")
+		return client.DeviceFlow(ctx, devicePrompt)
+	}
 }
 
 func (p *trufoProvider) DataSources(_ context.Context) []func() datasource.DataSource {

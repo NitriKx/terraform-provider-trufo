@@ -2,7 +2,8 @@ package provider
 
 import (
 	"context"
-	"strconv"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -130,7 +131,14 @@ func (d *certificatesDataSource) Read(ctx context.Context, req datasource.ReadRe
 		objs = append(objs, obj)
 	}
 
-	cfg.ID = types.StringValue(strconv.Itoa(len(certs)))
+	// Stable ID: a hash of the serial numbers, so it does not change merely
+	// because the certificate count changed.
+	h := sha256.New()
+	for _, c := range certs {
+		h.Write([]byte(c.SerialNumber))
+		h.Write([]byte{0})
+	}
+	cfg.ID = types.StringValue(hex.EncodeToString(h.Sum(nil))[:16])
 	cfg.Certs = types.ListValueMust(certificateObjectType(), objs)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &cfg)...)

@@ -63,15 +63,17 @@ func (d *generatorProductDataSource) Schema(_ context.Context, _ datasource.Sche
 			"gp_id": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: "Generator product ID (`gp_…`) to look up directly.",
+				MarkdownDescription: "Generator product ID (`gp_…`) to look up directly. Exactly one of `gp_id` / `name` must be set.",
 			},
 			"name": schema.StringAttribute{
 				Optional:            true,
+				Computed:            true,
 				MarkdownDescription: "Product name to match when listing. Exactly one of `gp_id` / `name` must be set.",
 			},
 			"oid": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Organization ID passed to `/gproduct/list` (required by its request schema; the server uses your credential's organization).",
+				Computed:            true,
+				MarkdownDescription: "Organization ID passed to `/gproduct/list` (required by its request schema; the server uses your credential's organization). When looking up by `gp_id` and `oid` is unset, the ID is resolved from `/gproduct/info`.",
 			},
 			"implementation": schema.StringAttribute{
 				Computed: true,
@@ -108,32 +110,49 @@ func (d *generatorProductDataSource) Read(ctx context.Context, req datasource.Re
 	}
 	client := d.client
 
+	gpIDSet := !cfg.GPID.IsNull() && cfg.GPID.ValueString() != ""
+	nameSet := !cfg.Name.IsNull() && cfg.Name.ValueString() != ""
+	if gpIDSet && nameSet {
+		resp.Diagnostics.AddError("Conflicting lookup keys", "Set exactly one of gp_id or name, not both.")
+		return
+	}
+	if !gpIDSet && !nameSet {
+		resp.Diagnostics.AddError("Missing lookup key", "Set exactly one of gp_id or name.")
+		return
+	}
+
 	// The list endpoint carries the PV status fields; the info endpoint
-	// carries oid/created_by/created_at. Merge both.
+	// carries oid/created_by/created_at. /gproduct/list requires oid in the
+	// body, so when looking up by gp_id and oid is unset, resolve the oid from
+	// /gproduct/info first.
 	oid := cfg.OID.ValueString()
+	if oid == "" && gpIDSet {
+		if info, err := client.GetGProduct(ctx, cfg.GPID.ValueString()); err == nil {
+			oid = info.OID
+		} else {
+			resp.Diagnostics.AddWarning("Could not resolve organization ID", fmt.Sprintf("Falling back to an empty oid for /gproduct/list: %v", err))
+		}
+	}
 	gps, err := client.ListGProducts(ctx, oid)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to list generator products", err.Error())
 		return
 	}
 	var listed *trufo.GProduct
-	if !cfg.GPID.IsNull() && cfg.GPID.ValueString() != "" {
+	if gpIDSet {
 		for i := range gps {
 			if gps[i].GPID == cfg.GPID.ValueString() {
 				listed = &gps[i]
 				break
 			}
 		}
-	} else if !cfg.Name.IsNull() && cfg.Name.ValueString() != "" {
+	} else {
 		for i := range gps {
 			if gps[i].Name == cfg.Name.ValueString() {
 				listed = &gps[i]
 				break
 			}
 		}
-	} else {
-		resp.Diagnostics.AddError("Missing lookup key", "Set exactly one of gp_id or name.")
-		return
 	}
 	if listed == nil {
 		resp.Diagnostics.AddError("Generator product not found",
@@ -149,6 +168,8 @@ func (d *generatorProductDataSource) Read(ctx context.Context, req datasource.Re
 		if info.Name != "" {
 			gp.Name = info.Name
 		}
+	} else {
+		resp.Diagnostics.AddWarning("Could not read generator product info", fmt.Sprintf("Using list data only for %s: %v", gp.GPID, err))
 	}
 
 	cfg.ID = types.StringValue(gp.GPID)

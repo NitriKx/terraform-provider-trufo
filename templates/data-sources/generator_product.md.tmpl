@@ -1,0 +1,20 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.ProviderName}}"
+subcategory: "Generator Products"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+-> **Note** Generator products are created in the Trufo dashboard (as part of a Product Validation
+application), so this data source is read-only. Look up by `gp_id` or by `name`. Requires a Bearer
+access token (`access_token`/`refresh_token`).
+
+## Example Usage
+
+{{ tffile "examples/data-sources/trufo_generator_product/data-source.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

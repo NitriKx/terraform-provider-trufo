@@ -3,10 +3,13 @@ package trufo
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -58,9 +61,15 @@ func WithTokens(access, refresh string) Option {
 func WithHTTPClient(hc *http.Client) Option { return func(c *Client) { c.HTTPClient = hc } }
 
 // NewClient returns a Client for the given API base URL (default APIURL).
+// The Trufo API requires TLS 1.3+; the default transport enforces it. Plain
+// http:// URLs are only accepted for loopback test servers.
 func NewClient(baseURL string, opts ...Option) *Client {
 	if baseURL == "" {
 		baseURL = APIURL
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+	if u, err := url.Parse(baseURL); err == nil && u.Scheme == "http" && u.Hostname() != "127.0.0.1" && u.Hostname() != "localhost" && u.Hostname() != "::1" {
+		panic("trufo: plaintext HTTP base URL rejected (TLS 1.3+ required): " + baseURL)
 	}
 	c := &Client{BaseURL: baseURL}
 	for _, opt := range opts {
@@ -75,7 +84,12 @@ func NewClient(baseURL string, opts ...Option) *Client {
 		}
 	}
 	if c.HTTPClient == nil {
-		c.HTTPClient = &http.Client{Timeout: DefaultTimeout}
+		c.HTTPClient = &http.Client{
+			Timeout: DefaultTimeout,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13},
+			},
+		}
 	}
 	if c.UserAgent == "" {
 		c.UserAgent = "trufo-go/" + SDKVersion
@@ -126,7 +140,9 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		// Retry once with a refreshed token on 401, like TrufoSession.
 		if resp.StatusCode == http.StatusUnauthorized && c.RefreshToken != "" {
 			if refreshErr := c.Refresh(ctx); refreshErr != nil {
-				return apiErr
+				// Surface both: the original 401 and why the refresh failed
+				// (e.g. the refresh token was already rotated/revoked).
+				return fmt.Errorf("%w (token refresh failed: %v)", apiErr, refreshErr)
 			}
 			req2, err := c.newRequest(ctx, c.BaseURL+path, method, body)
 			if err != nil {

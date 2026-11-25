@@ -1,7 +1,8 @@
 terraform {
   required_providers {
     trufo = {
-      source = "nitrikx/trufo"
+      source  = "nitrikx/trufo"
+      version = "~> 0.1"
     }
   }
 }

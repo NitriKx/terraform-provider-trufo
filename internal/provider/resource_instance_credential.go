@@ -62,7 +62,8 @@ func (r *instanceCredentialResource) Schema(_ context.Context, _ resource.Schema
 			"(`POST /gproduct/instance/credential/register`). The matching private key signs the client assertion that " +
 			"requests CSR JWTs for certificate enrollment; the private key never leaves your systems. " +
 			"An instance may hold at most **two active credentials**: register the replacement, cut over, then revoke the old one. " +
-			"Deleting this resource revokes the credential (permanent).",
+			"Deleting this resource revokes the credential (permanent). " +
+			"Auth: an MFA-verified access token (`access_token`/`refresh_token`); on the test host a `gproduct-admin` scoped API key also works.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,

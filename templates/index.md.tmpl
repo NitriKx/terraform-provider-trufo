@@ -15,7 +15,7 @@ The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance
 - **AI systems** (`trufo_ai_system`) — registered AI systems referenced when signing and watermarking
 - **Read-only lookups** — `trufo_generator_product` and `trufo_certificates` data sources
 
-The API client used by the provider is [`github.com/NitriKx/terraform-provider-trufo/trufo-go`](./trufo-go), a Go port of the official
+The API client used by the provider is [`github.com/NitriKx/terraform-provider-trufo/trufo-go`](https://github.com/NitriKx/terraform-provider-trufo/tree/main/trufo-go), a Go port of the official
 [Python SDK](https://github.com/trufo-ai/trufo-py).
 
 ## Regions and hosts
@@ -66,5 +66,7 @@ creation, and ES256 (EC P-256) public-key enrollment (see
 [`examples/full-signing-instance/`](https://github.com/NitriKx/terraform-provider-trufo/tree/main/examples/full-signing-instance)):
 
 {{tffile "examples/full-signing-instance/main.tf"}}
+
+See also the [key rotation guide](./guides/key-rotation.md).
 
 {{ .SchemaMarkdown }}
