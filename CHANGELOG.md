@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/NitriKx/terraform-provider-trufo-ai/compare/v0.2.0...v0.2.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **release:** checkout the tag on manual dispatch so goreleaser sees it ([2f73ccb](https://github.com/NitriKx/terraform-provider-trufo-ai/commit/2f73ccb69425654f022ab7f41d65d1ba76ba8e0d))
+* **release:** run goreleaser on the tag ref for manual dispatch ([a266d3c](https://github.com/NitriKx/terraform-provider-trufo-ai/commit/a266d3c041709e2aca4af7f198048e7cb8f9b873))
+
 ## [0.2.0](https://github.com/NitriKx/terraform-trufo-ai-provider/compare/v0.1.0...v0.2.0) (2026-11-25)
 
 
