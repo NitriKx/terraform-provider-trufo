@@ -10,13 +10,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/NitriKx/terraform-trufo-ai-provider/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo-ai/trufo-go"
 )
 
 var _ resource.Resource = (*instanceResource)(nil)
 var _ resource.ResourceWithImportState = (*instanceResource)(nil)
 
-// NewInstanceResource creates a trufo_instance resource.
+// NewInstanceResource creates a trufo-ai_instance resource.
 func NewInstanceResource() resource.Resource { return &instanceResource{} }
 
 type instanceResource struct {

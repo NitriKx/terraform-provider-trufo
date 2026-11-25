@@ -10,12 +10,12 @@ description: |-
 
 The Trufo provider manages resources of the [Trufo](https://trufo.ai) Provenance Platform through the Trufo API:
 
-- **Generator product instances** (`trufo_instance`) — one signing identity per independent key holder
-- **Instance credentials** (`trufo_instance_credential`) — public-key enrollment on an instance (delete = revoke)
-- **AI systems** (`trufo_ai_system`) — registered AI systems referenced when signing and watermarking
-- **Read-only lookups** — `trufo_generator_product` and `trufo_certificates` data sources
+- **Generator product instances** (`trufo-ai_instance`) — one signing identity per independent key holder
+- **Instance credentials** (`trufo-ai_instance_credential`) — public-key enrollment on an instance (delete = revoke)
+- **AI systems** (`trufo-ai_ai_system`) — registered AI systems referenced when signing and watermarking
+- **Read-only lookups** — `trufo-ai_generator_product` and `trufo-ai_certificates` data sources
 
-The API client used by the provider is [`github.com/NitriKx/terraform-trufo-ai-provider/trufo-go`](./trufo-go), a Go port of the official
+The API client used by the provider is [`github.com/NitriKx/terraform-provider-trufo-ai/trufo-go`](./trufo-go), a Go port of the official
 [Python SDK](https://github.com/trufo-ai/trufo-py).
 
 ## Regions and hosts
@@ -30,14 +30,14 @@ or a full `api_url` (or the `TRUFO_API_URL` environment variable):
 | `https://test.api.trufo.ai` | `test` | Test API — certificate test flow and test-scoped keys; nothing carries over to production |
 
 ```terraform
-provider "trufo" {} # production, global (default)
+provider "trufo-ai" {} # production, global (default)
 
-provider "trufo" {
+provider "trufo-ai" {
   alias  = "eu"
   region = "eu"
 }
 
-provider "trufo" {
+provider "trufo-ai" {
   alias  = "test"
   region = "test"
 }
@@ -51,8 +51,8 @@ Every API request carries exactly one credential. The provider supports both, li
   A `gproduct-admin` scoped key manages instances and credentials; `c2pa-sign-*`/`watermark-*` keys cover the
   AI system endpoints (production hosts only).
 - **Access token** — `access_token` + `refresh_token` (env `TRUFO_ACCESS_TOKEN` / `TRUFO_REFRESH_TOKEN`),
-  sent as `Authorization: Bearer`, refreshed automatically on 401. Required for `trufo_generator_product` and
-  `trufo_certificates`. If only a `trufo-api` scoped `api_key` is set, the provider runs the interactive login
+  sent as `Authorization: Bearer`, refreshed automatically on 401. Required for `trufo-ai_generator_product` and
+  `trufo-ai_certificates`. If only a `trufo-api` scoped `api_key` is set, the provider runs the interactive login
   at configure time (`auth_flow`: `auto`/`loopback`/`device`/`none`).
 
 ## Example usage
@@ -61,7 +61,7 @@ Every API request carries exactly one credential. The provider supports both, li
 terraform {
   required_providers {
     trufo = {
-      source = "nitrikx/trufo"
+      source = "nitrikx/trufo-ai"
     }
   }
 }
@@ -71,25 +71,25 @@ terraform {
 #   TRUFO_API_KEY                    API key (X-API-Key: {scope}:{key})
 #   TRUFO_ACCESS_TOKEN + TRUFO_REFRESH_TOKEN   Bearer token pair
 #   TRUFO_API_URL                   overrides the host
-provider "trufo" {}
+provider "trufo-ai" {}
 
 # EU production API (https://eu.api.trufo.ai): media submitted there is
 # processed and stored in EU infrastructure.
-provider "trufo" {
+provider "trufo-ai" {
   alias  = "eu"
   region = "eu"
 }
 
 # Test API (https://test.api.trufo.ai): certificate test flow and test-scoped
 # keys (e.g. c2pa-sign-test, gproduct-admin on the test host).
-provider "trufo" {
+provider "trufo-ai" {
   alias  = "test"
   region = "test"
 }
 
 # A dedicated host, if your organization was provisioned one:
 #
-# provider "trufo" {
+# provider "trufo-ai" {
 #   alias   = "dedicated"
 #   api_url = "https://your-host.api.trufo.ai"
 # }
@@ -97,7 +97,7 @@ provider "trufo" {
 # A trufo-api scoped API key without tokens triggers the interactive login
 # (loopback browser flow, falling back to the device flow):
 #
-# provider "trufo" {
+# provider "trufo-ai" {
 #   api_key   = var.trufo_api_key # trufo-api:...
 #   auth_flow = "auto"            # auto | loopback | device | none
 # }
@@ -107,13 +107,13 @@ provider "trufo" {
 
 A complete C2PA signing instance with an enrolled key — generator product lookup by name, instance
 creation, and ES256 (EC P-256) public-key enrollment (see
-[`examples/full-signing-instance/`](https://github.com/NitriKx/terraform-trufo-ai-provider/tree/main/examples/full-signing-instance)):
+[`examples/full-signing-instance/`](https://github.com/NitriKx/terraform-provider-trufo-ai/tree/main/examples/full-signing-instance)):
 
 ```terraform
 terraform {
   required_providers {
     trufo = {
-      source = "nitrikx/trufo"
+      source = "nitrikx/trufo-ai"
     }
   }
 }
@@ -129,7 +129,7 @@ terraform {
 #                                             (a gproduct-admin key manages instances/credentials)
 #   TRUFO_ACCESS_TOKEN + TRUFO_REFRESH_TOKEN  Bearer token pair (required for the generator product
 #                                             data source below; refreshed automatically on 401)
-provider "trufo" {
+provider "trufo-ai" {
   # region = "eu"
 }
 
@@ -137,15 +137,15 @@ provider "trufo" {
 # Validation application); look yours up here by ID (gp_...) or by name — set
 # exactly one. Requires an active Product Validation on the product before
 # instances can be created.
-data "trufo_generator_product" "c2pa" {
+data "trufo-ai_generator_product" "c2pa" {
   gp_id = var.generator_product_id != "" ? var.generator_product_id : null
   name  = var.generator_product_id == "" ? var.generator_product_name : null
 }
 
 # One signing instance per signing identity: it holds its own credentials and
 # is issued its own certificates.
-resource "trufo_instance" "signing" {
-  gp_id = data.trufo_generator_product.c2pa.id
+resource "trufo-ai_instance" "signing" {
+  gp_id = data.trufo-ai_generator_product.c2pa.id
   name  = var.instance_name
 }
 
@@ -164,14 +164,14 @@ resource "trufo_instance" "signing" {
 # (POST /ra/c2pa/csr-jwt).
 #
 # An instance may hold at most TWO active credentials. To rotate a key: apply
-# with the new credential added (as a second trufo_instance_credential), cut
+# with the new credential added (as a second trufo-ai_instance_credential), cut
 # your signer over to the new key, then remove the old resource from the
 # config and apply again.
 #
 # Delete semantics: removing this resource from the config (or `terraform
 # destroy`) REVOKES the credential on the server — revocation is permanent.
-resource "trufo_instance_credential" "primary" {
-  gpi_id         = trufo_instance.signing.id
+resource "trufo-ai_instance_credential" "primary" {
+  gpi_id         = trufo-ai_instance.signing.id
   public_key_pem = file(var.credential_public_key_path)
   key_algorithm  = "ES256" # EC P-256; EdDSA (Ed25519) is also accepted
   label          = var.credential_label

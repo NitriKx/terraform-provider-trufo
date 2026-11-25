@@ -24,7 +24,7 @@ func TestAccAISystemResource_basic(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccBearerProviderConfig("") + fmt.Sprintf(`
-resource "trufo_ai_system" "test" {
+resource "trufo-ai_ai_system" "test" {
   name                 = %q
   version              = "0.0.1"
   ai_involvement_modes = ["ai_generated"]
@@ -34,12 +34,12 @@ resource "trufo_ai_system" "test" {
 `, name),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"trufo_ai_system.test",
+						"trufo-ai_ai_system.test",
 						tfjsonpath.New("id"),
 						knownvalue.StringRegexp(regexp.MustCompile(`^aisys_`)),
 					),
 					statecheck.ExpectKnownValue(
-						"trufo_ai_system.test",
+						"trufo-ai_ai_system.test",
 						tfjsonpath.New("status"),
 						knownvalue.StringExact("active"),
 					),
@@ -48,7 +48,7 @@ resource "trufo_ai_system" "test" {
 			// Update: toggle status to inactive and back.
 			{
 				Config: testAccBearerProviderConfig("") + fmt.Sprintf(`
-resource "trufo_ai_system" "test" {
+resource "trufo-ai_ai_system" "test" {
   name                 = %q
   version              = "0.0.1"
   ai_involvement_modes = ["ai_generated"]
@@ -58,14 +58,14 @@ resource "trufo_ai_system" "test" {
 `, name),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"trufo_ai_system.test",
+						"trufo-ai_ai_system.test",
 						tfjsonpath.New("status"),
 						knownvalue.StringExact("inactive"),
 					),
 				},
 			},
 			{
-				ResourceName:      "trufo_ai_system.test",
+				ResourceName:      "trufo-ai_ai_system.test",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},

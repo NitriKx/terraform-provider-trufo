@@ -1,4 +1,4 @@
-// Command terraform-provider-trufo serves the Trufo Terraform provider.
+// Command terraform-provider-trufo-ai serves the Trufo Terraform provider.
 package main
 
 import (
@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/NitriKx/terraform-trufo-ai-provider/internal/provider"
+	"github.com/NitriKx/terraform-provider-trufo-ai/internal/provider"
 )
 
 // version is set by goreleaser via -ldflags "-X main.version=...".
@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/nitrikx/trufo",
+		Address: "registry.terraform.io/nitrikx/trufo-ai",
 		Debug:   debug,
 	}
 

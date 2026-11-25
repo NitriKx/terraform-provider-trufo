@@ -2,11 +2,11 @@
 
 End-to-end setup of a Trufo C2PA signing instance:
 
-1. Look up a generator product by name (`data "trufo_generator_product"`) — products are
+1. Look up a generator product by name (`data "trufo-ai_generator_product"`) — products are
    created in the Trufo dashboard as part of a Product Validation application.
-2. Create a signing instance under it (`trufo_instance`).
+2. Create a signing instance under it (`trufo-ai_instance`).
 3. Enroll the **public** key of an ES256 (EC P-256) key pair on the instance
-   (`trufo_instance_credential`).
+   (`trufo-ai_instance_credential`).
 
 ## Authentication
 
@@ -16,7 +16,7 @@ Export exactly one credential before running Terraform (never hardcode it):
 # API key (X-API-Key: {scope}:{key}) — a gproduct-admin key manages instances/credentials
 export TRUFO_API_KEY='gproduct-admin:...'
 
-# OR a Bearer token pair — required for the trufo_generator_product data source
+# OR a Bearer token pair — required for the trufo-ai_generator_product data source
 export TRUFO_ACCESS_TOKEN='...'
 export TRUFO_REFRESH_TOKEN='...'
 ```
@@ -58,10 +58,10 @@ Or put the values in a `terraform.tfvars` (gitignored here) and run plain `terra
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `generator_product_name` | Generator product name looked up via `trufo_generator_product` (required) | — |
-| `instance_name` | Name of the `trufo_instance` signing instance | `c2pa-signing-1` |
+| `generator_product_name` | Generator product name looked up via `trufo-ai_generator_product` (required) | — |
+| `instance_name` | Name of the `trufo-ai_instance` signing instance | `c2pa-signing-1` |
 | `credential_public_key_path` | Path to the PEM public key to enroll (ES256 / EC P-256) | `instance-public-key.pem` |
-| `credential_label` | Label of the `trufo_instance_credential` | `primary-2026-11` |
+| `credential_label` | Label of the `trufo-ai_instance_credential` | `primary-2026-11` |
 
 ## Outputs
 
@@ -71,8 +71,8 @@ Or put the values in a `terraform.tfvars` (gitignored here) and run plain `terra
 ## Key rotation and revocation
 
 - An instance may hold at most **two active credentials**. To rotate: add a second
-  `trufo_instance_credential` (new key pair, new label), apply, cut your signer over to
+  `trufo-ai_instance_credential` (new key pair, new label), apply, cut your signer over to
   the new key, then remove the old credential resource and apply again.
-- **Deleting a `trufo_instance_credential` resource revokes the credential** on the server
+- **Deleting a `trufo-ai_instance_credential` resource revokes the credential** on the server
   (`terraform destroy` included) — revocation is permanent.
-- Import an existing credential with `terraform import trufo_instance_credential.primary '{gpi_id}/{gpic_id}'`.
+- Import an existing credential with `terraform import trufo-ai_instance_credential.primary '{gpi_id}/{gpic_id}'`.

@@ -53,13 +53,13 @@ func TestAccInstanceCredentialResource_basic(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProviderConfig() + fmt.Sprintf(`
-resource "trufo_instance" "test" {
+resource "trufo-ai_instance" "test" {
   gp_id = %q
   name  = %q
 }
 
-resource "trufo_instance_credential" "test" {
-  gpi_id         = trufo_instance.test.id
+resource "trufo-ai_instance_credential" "test" {
+  gpi_id         = trufo-ai_instance.test.id
   public_key_pem = %q
   key_algorithm  = "ES256"
   label          = "tf-acc"
@@ -67,17 +67,17 @@ resource "trufo_instance_credential" "test" {
 `, testGPID(), instanceName, publicKeyPEM),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"trufo_instance_credential.test",
+						"trufo-ai_instance_credential.test",
 						tfjsonpath.New("id"),
 						knownvalue.StringRegexp(regexp.MustCompile(`^gpic_`)),
 					),
 					statecheck.ExpectKnownValue(
-						"trufo_instance_credential.test",
+						"trufo-ai_instance_credential.test",
 						tfjsonpath.New("key_algorithm"),
 						knownvalue.StringExact("ES256"),
 					),
 					statecheck.ExpectKnownValue(
-						"trufo_instance_credential.test",
+						"trufo-ai_instance_credential.test",
 						tfjsonpath.New("revoked"),
 						knownvalue.Bool(false),
 					),
@@ -85,9 +85,9 @@ resource "trufo_instance_credential" "test" {
 			},
 			// Import as "{gpi_id}/{gpic_id}".
 			{
-				ResourceName:      "trufo_instance_credential.test",
+				ResourceName:      "trufo-ai_instance_credential.test",
 				ImportState:       true,
-				ImportStateIdFunc: importCredentialID("trufo_instance_credential.test"),
+				ImportStateIdFunc: importCredentialID("trufo-ai_instance_credential.test"),
 				ImportStateVerify: true,
 				// public_key_pem is not returned by the API; ignore it on import verify.
 				ImportStateVerifyIgnore: []string{"public_key_pem"},

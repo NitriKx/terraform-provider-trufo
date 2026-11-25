@@ -10,7 +10,7 @@ import (
 
 // testAccProviderFactories wires the provider under test for acceptance tests.
 var testAccProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"trufo": providerserver.NewProtocol6WithError(New("test")()),
+	"trufo-ai": providerserver.NewProtocol6WithError(New("test")()),
 }
 
 // testAccPreCheck skips acceptance tests unless TF_ACC is set and the Trufo
@@ -46,7 +46,7 @@ func testGPID() string { return os.Getenv("TRUFO_TEST_GP_ID") }
 // Credentials come from the environment (TRUFO_API_KEY).
 func testAccProviderConfig() string {
 	return `
-provider "trufo" {
+provider "trufo-ai" {
   api_url = "` + testAPIURL() + `"
 }
 `

@@ -22,23 +22,23 @@ func TestAccGeneratorProductDataSource_byID(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccBearerProviderConfig(testAPIURL()) + fmt.Sprintf(`
-data "trufo_generator_product" "test" {
+data "trufo-ai_generator_product" "test" {
   gp_id = %q
 }
 `, testGPID()),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"data.trufo_generator_product.test",
+						"data.trufo-ai_generator_product.test",
 						tfjsonpath.New("id"),
 						knownvalue.StringExact(testGPID()),
 					),
 					statecheck.ExpectKnownValue(
-						"data.trufo_generator_product.test",
+						"data.trufo-ai_generator_product.test",
 						tfjsonpath.New("gp_id"),
 						knownvalue.StringRegexp(regexp.MustCompile(`^gp_`)),
 					),
 					statecheck.ExpectKnownValue(
-						"data.trufo_generator_product.test",
+						"data.trufo-ai_generator_product.test",
 						tfjsonpath.New("oid"),
 						knownvalue.StringRegexp(regexp.MustCompile(`^org_`)),
 					),

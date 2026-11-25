@@ -1,5 +1,5 @@
 // Package provider implements the Trufo Terraform provider
-// (registry.terraform.io/nitrikx/trufo).
+// (registry.terraform.io/nitrikx/trufo-ai).
 package provider
 
 import (
@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/NitriKx/terraform-trufo-ai-provider/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo-ai/trufo-go"
 )
 
 // Env vars, mirroring the trufo-py SDK (TRUFO_API_KEY, TRUFO_ACCESS_TOKEN,
@@ -59,7 +59,7 @@ type trufoProviderModel struct {
 }
 
 func (p *trufoProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "trufo"
+	resp.TypeName = "trufo-ai"
 	resp.Version = p.version
 }
 
