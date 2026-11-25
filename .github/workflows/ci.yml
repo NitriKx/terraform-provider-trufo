@@ -50,7 +50,7 @@ jobs:
           go-version: '1.27'
       - name: Generate docs and check they are up to date
         run: |
-          go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name trufo
+          go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name trufo-ai
           test -z "$(git status --porcelain docs examples templates)"
 
   acceptance:
