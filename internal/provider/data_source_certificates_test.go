@@ -18,12 +18,12 @@ func TestAccCertificatesDataSource_list(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccBearerProviderConfig(testAPIURL()) + `
-data "trufo-ai_certificates" "test" {}
+data "trufo_certificates" "test" {}
 `,
 				ConfigStateChecks: []statecheck.StateCheck{
 					// id is the certificate count; just check it is a number string.
 					statecheck.ExpectKnownValue(
-						"data.trufo-ai_certificates.test",
+						"data.trufo_certificates.test",
 						tfjsonpath.New("id"),
 						knownvalue.StringRegexp(regexp.MustCompile(`^\d+$`)),
 					),

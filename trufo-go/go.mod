@@ -1,3 +1,3 @@
-module github.com/NitriKx/terraform-provider-trufo-ai/trufo-go
+module github.com/NitriKx/terraform-provider-trufo/trufo-go
 
 go 1.27

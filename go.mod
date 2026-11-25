@@ -1,9 +1,9 @@
-module github.com/NitriKx/terraform-provider-trufo-ai
+module github.com/NitriKx/terraform-provider-trufo
 
 go 1.27
 
 require (
-	github.com/NitriKx/terraform-provider-trufo-ai/trufo-go v0.0.0
+	github.com/NitriKx/terraform-provider-trufo/trufo-go v0.0.0
 	github.com/hashicorp/terraform-plugin-docs v0.25.0
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
@@ -86,4 +86,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/NitriKx/terraform-provider-trufo-ai/trufo-go => ./trufo-go
+replace github.com/NitriKx/terraform-provider-trufo/trufo-go => ./trufo-go

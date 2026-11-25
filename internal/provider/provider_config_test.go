@@ -3,7 +3,7 @@ package provider
 import (
 	"testing"
 
-	trufo "github.com/NitriKx/terraform-provider-trufo-ai/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 func TestResolveAPIURL(t *testing.T) {

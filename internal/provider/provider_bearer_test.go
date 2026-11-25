@@ -32,7 +32,7 @@ func testAccBearerProviderConfig(apiURL string) string {
 		apiURL = testProdAPIURL()
 	}
 	return `
-provider "trufo-ai" {
+provider "trufo" {
   api_url = "` + apiURL + `"
 }
 `

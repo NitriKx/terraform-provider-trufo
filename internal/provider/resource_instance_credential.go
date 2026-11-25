@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/NitriKx/terraform-provider-trufo-ai/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var (
@@ -22,7 +22,7 @@ var (
 	_ resource.ResourceWithImportState = (*instanceCredentialResource)(nil)
 )
 
-// NewInstanceCredentialResource creates a trufo-ai_instance_credential resource.
+// NewInstanceCredentialResource creates a trufo_instance_credential resource.
 func NewInstanceCredentialResource() resource.Resource { return &instanceCredentialResource{} }
 
 type instanceCredentialResource struct {

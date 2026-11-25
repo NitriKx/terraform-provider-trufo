@@ -8,12 +8,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/NitriKx/terraform-provider-trufo-ai/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var _ datasource.DataSource = (*generatorProductDataSource)(nil)
 
-// NewGeneratorProductDataSource creates a trufo-ai_generator_product data source.
+// NewGeneratorProductDataSource creates a trufo_generator_product data source.
 func NewGeneratorProductDataSource() datasource.DataSource { return &generatorProductDataSource{} }
 
 type generatorProductDataSource struct {

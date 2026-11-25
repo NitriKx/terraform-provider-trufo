@@ -1,22 +1,22 @@
 # Terraform Provider for Trufo
 
-[![CI](https://github.com/NitriKx/terraform-provider-trufo-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/NitriKx/terraform-provider-trufo-ai/actions/workflows/ci.yml)
+[![CI](https://github.com/NitriKx/terraform-provider-trufo/actions/workflows/ci.yml/badge.svg)](https://github.com/NitriKx/terraform-provider-trufo/actions/workflows/ci.yml)
 
 Terraform provider for the [Trufo](https://trufo.ai) Provenance Platform, built on
-[`github.com/NitriKx/terraform-provider-trufo-ai/trufo-go`](./trufo-go) — a Go client ported from the official
+[`github.com/NitriKx/terraform-provider-trufo/trufo-go`](./trufo-go) — a Go client ported from the official
 [Python SDK (trufo-py)](https://github.com/trufo-ai/trufo-py).
 
-Provider address: `registry.terraform.io/nitrikx/trufo-ai`
+Provider address: `registry.terraform.io/nitrikx/trufo`
 
 ## Resources & data sources
 
 | Type | API | Notes |
 | --- | --- | --- |
-| `trufo-ai_instance` | `POST /gproduct/instance/*` | Full CRUD; import by `gpi_…` |
-| `trufo-ai_instance_credential` | `POST /gproduct/instance/credential/*` | Enroll a public key; delete = revoke; import as `{gpi_id}/{gpic_id}` |
-| `trufo-ai_ai_system` | `POST /ai-system/*` | Register + active/inactive toggle; delete = inactive; production hosts only |
-| `trufo-ai_generator_product` (data source) | `POST /gproduct/list`, `/gproduct/info` | Products are created in the dashboard; Bearer auth |
-| `trufo-ai_certificates` (data source) | `POST /cert/list` | Bearer auth |
+| `trufo_instance` | `POST /gproduct/instance/*` | Full CRUD; import by `gpi_…` |
+| `trufo_instance_credential` | `POST /gproduct/instance/credential/*` | Enroll a public key; delete = revoke; import as `{gpi_id}/{gpic_id}` |
+| `trufo_ai_system` | `POST /ai-system/*` | Register + active/inactive toggle; delete = inactive; production hosts only |
+| `trufo_generator_product` (data source) | `POST /gproduct/list`, `/gproduct/info` | Products are created in the dashboard; Bearer auth |
+| `trufo_certificates` (data source) | `POST /cert/list` | Bearer auth |
 
 ## Authentication
 
@@ -41,14 +41,14 @@ full `api_url` (or the `TRUFO_API_URL` env var):
 | `https://test.api.trufo.ai` | `test` | Test API — certificate test flow and test-scoped keys; nothing carries over to production |
 
 ```hcl
-provider "trufo-ai" {} # production, global (default)
+provider "trufo" {} # production, global (default)
 
-provider "trufo-ai" {
+provider "trufo" {
   alias  = "eu"
   region = "eu"
 }
 
-provider "trufo-ai" {
+provider "trufo" {
   alias  = "test"
   region = "test"
 }
@@ -58,22 +58,22 @@ provider "trufo-ai" {
 terraform {
   required_providers {
     trufo = {
-      source = "nitrikx/trufo-ai"
+      source = "nitrikx/trufo"
     }
   }
 }
 
-provider "trufo-ai" {
+provider "trufo" {
   region = "test" # TRUFO_API_KEY env var provides the API key
 }
 
-resource "trufo-ai_instance" "signing_service" {
+resource "trufo_instance" "signing_service" {
   gp_id = "gp_..."
   name  = "signing-service-eu-1"
 }
 
-resource "trufo-ai_instance_credential" "primary" {
-  gpi_id         = trufo-ai_instance.signing_service.id
+resource "trufo_instance_credential" "primary" {
+  gpi_id         = trufo_instance.signing_service.id
   public_key_pem = file("instance-public-key.pem")
   key_algorithm  = "ES256"
   label          = "primary-2026"
@@ -91,7 +91,7 @@ go build ./...                 # build provider + client
 go test ./...                  # unit tests (client uses a mock server)
 TF_ACC=1 TRUFO_API_KEY=... TRUFO_TEST_GP_ID=gp_... go test ./internal/provider/ -run TestAcc -v
                                # acceptance tests against test.api.trufo.ai
-go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name trufo-ai   # regenerate docs/
+go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-name trufo   # regenerate docs/
 ```
 
 Acceptance tests run against `https://test.api.trufo.ai` (override with `TRUFO_TEST_API_URL`; AI system tests
@@ -105,15 +105,15 @@ use `https://api.trufo.ai`, override with `TRUFO_PROD_API_URL`) and need:
 
 ## Repository & provider address
 
-- Source: <https://github.com/NitriKx/terraform-provider-trufo-ai>
-- Provider address: `registry.terraform.io/nitrikx/trufo-ai` (Terraform source: `nitrikx/trufo-ai`)
+- Source: <https://github.com/NitriKx/terraform-provider-trufo>
+- Provider address: `registry.terraform.io/nitrikx/trufo` (Terraform source: `nitrikx/trufo`)
 
 ## Release process
 
-1. Create the GitHub repo `NitriKx/terraform-provider-trufo-ai` and push. You need a one-off
+1. Create the GitHub repo `NitriKx/terraform-provider-trufo` and push. You need a one-off
    credential for this (a PAT with `repo` scope, or SSH) — the API being down only affects
    `gh repo create`; creating the repo in the web UI and pushing works the same:
-   `git remote add origin https://github.com/NitriKx/terraform-provider-trufo-ai.git && git push -u origin main`
+   `git remote add origin https://github.com/NitriKx/terraform-provider-trufo.git && git push -u origin main`
 2. Releases are automated with [release-please](.github/workflows/release-please.yml): on every
    push to `main` it opens a "release PR" that bumps the version (from conventional commits) and
    updates `CHANGELOG.md`. Merging that PR creates the `vX.Y.Z` tag and GitHub release.
@@ -127,7 +127,7 @@ use `https://api.trufo.ai`, override with `TRUFO_PROD_API_URL`) and need:
    linux/darwin/windows (amd64/arm64), writes `checksums.txt`, and attaches everything to the
    release.
 4. Publish the version on the Terraform Registry: sign in at <https://registry.terraform.io>
-   with the GitHub account, add provider `nitrikx/trufo-ai`, and publish the release (the UI links
+   with the GitHub account, add provider `nitrikx/trufo`, and publish the release (the UI links
    the GitHub release and verifies checksums). Only if you want to automate this step do you
    need a registry API token (profile → tokens at registry.terraform.io).
 5. CI (`CI` workflow) runs on every push/PR: build, `go vet`, `gofmt`, unit tests for both modules,
@@ -142,7 +142,7 @@ for this repo) opens PRs for Go modules (both modules) and GitHub Actions. Minor
 **auto-merged automatically once CI is green** (`automerge` + `platformAutomerge` in `renovate.json`);
 major updates stay as PRs for review. For platform auto-merge to work, the repo needs:
 
-- Settings → General → "Allow auto-merge" enabled (set via API: `gh api -X PATCH repos/NitriKx/terraform-provider-trufo-ai -F allow_auto_merge=true`)
+- Settings → General → "Allow auto-merge" enabled (set via API: `gh api -X PATCH repos/NitriKx/terraform-provider-trufo -F allow_auto_merge=true`)
 - Branch protection on `main` requiring the CI status checks (`test`, `docs`) and disallowing force-pushes
 
 ## License

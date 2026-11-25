@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/NitriKx/terraform-provider-trufo-ai/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 	_ resource.ResourceWithImportState = (*aiSystemResource)(nil)
 )
 
-// NewAISystemResource creates a trufo-ai_ai_system resource.
+// NewAISystemResource creates a trufo_ai_system resource.
 func NewAISystemResource() resource.Resource { return &aiSystemResource{} }
 
 type aiSystemResource struct {

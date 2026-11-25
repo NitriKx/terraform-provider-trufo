@@ -1,6 +1,6 @@
 version: 2
 
-project_name: terraform-provider-trufo-ai
+project_name: terraform-provider-trufo
 
 builds:
   - env:
@@ -12,7 +12,7 @@ builds:
     goarch:
       - amd64
       - arm64
-    binary: terraform-provider-trufo-ai
+    binary: terraform-provider-trufo
     ldflags:
       - -s -w -X main.version={{.Version}}
     mod_timestamp: '{{ .CommitTimestamp }}'
@@ -34,7 +34,7 @@ checksum:
 release:
   github:
     owner: NitriKx
-    name: terraform-provider-trufo-ai
+    name: terraform-provider-trufo
 
 changelog:
   sort: asc

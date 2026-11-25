@@ -9,12 +9,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	trufo "github.com/NitriKx/terraform-provider-trufo-ai/trufo-go"
+	trufo "github.com/NitriKx/terraform-provider-trufo/trufo-go"
 )
 
 var _ datasource.DataSource = (*certificatesDataSource)(nil)
 
-// NewCertificatesDataSource creates a trufo-ai_certificates data source.
+// NewCertificatesDataSource creates a trufo_certificates data source.
 func NewCertificatesDataSource() datasource.DataSource { return &certificatesDataSource{} }
 
 type certificatesDataSource struct {

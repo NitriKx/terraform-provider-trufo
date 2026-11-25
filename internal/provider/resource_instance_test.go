@@ -22,24 +22,24 @@ func TestAccInstanceResource_basic(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccProviderConfig() + fmt.Sprintf(`
-resource "trufo-ai_instance" "test" {
+resource "trufo_instance" "test" {
   gp_id = %q
   name  = %q
 }
 `, testGPID(), name),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"trufo-ai_instance.test",
+						"trufo_instance.test",
 						tfjsonpath.New("id"),
 						knownvalue.StringRegexp(regexp.MustCompile(`^gpi_`)),
 					),
 					statecheck.ExpectKnownValue(
-						"trufo-ai_instance.test",
+						"trufo_instance.test",
 						tfjsonpath.New("gp_id"),
 						knownvalue.StringExact(testGPID()),
 					),
 					statecheck.ExpectKnownValue(
-						"trufo-ai_instance.test",
+						"trufo_instance.test",
 						tfjsonpath.New("name"),
 						knownvalue.StringExact(name),
 					),
@@ -48,14 +48,14 @@ resource "trufo-ai_instance" "test" {
 			// Update: rename.
 			{
 				Config: testAccProviderConfig() + fmt.Sprintf(`
-resource "trufo-ai_instance" "test" {
+resource "trufo_instance" "test" {
   gp_id = %q
   name  = %q
 }
 `, testGPID(), renamed),
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(
-						"trufo-ai_instance.test",
+						"trufo_instance.test",
 						tfjsonpath.New("name"),
 						knownvalue.StringExact(renamed),
 					),
@@ -63,7 +63,7 @@ resource "trufo-ai_instance" "test" {
 			},
 			// Import by gpi_id.
 			{
-				ResourceName:      "trufo-ai_instance.test",
+				ResourceName:      "trufo_instance.test",
 				ImportState:       true,
 				ImportStateVerify: true,
 			},

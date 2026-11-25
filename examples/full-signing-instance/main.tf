@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     trufo = {
-      source = "nitrikx/trufo-ai"
+      source = "nitrikx/trufo"
     }
   }
 }
@@ -17,7 +17,7 @@ terraform {
 #                                             (a gproduct-admin key manages instances/credentials)
 #   TRUFO_ACCESS_TOKEN + TRUFO_REFRESH_TOKEN  Bearer token pair (required for the generator product
 #                                             data source below; refreshed automatically on 401)
-provider "trufo-ai" {
+provider "trufo" {
   # region = "eu"
 }
 
@@ -25,15 +25,15 @@ provider "trufo-ai" {
 # Validation application); look yours up here by ID (gp_...) or by name — set
 # exactly one. Requires an active Product Validation on the product before
 # instances can be created.
-data "trufo-ai_generator_product" "c2pa" {
+data "trufo_generator_product" "c2pa" {
   gp_id = var.generator_product_id != "" ? var.generator_product_id : null
   name  = var.generator_product_id == "" ? var.generator_product_name : null
 }
 
 # One signing instance per signing identity: it holds its own credentials and
 # is issued its own certificates.
-resource "trufo-ai_instance" "signing" {
-  gp_id = data.trufo-ai_generator_product.c2pa.id
+resource "trufo_instance" "signing" {
+  gp_id = data.trufo_generator_product.c2pa.id
   name  = var.instance_name
 }
 
@@ -52,14 +52,14 @@ resource "trufo-ai_instance" "signing" {
 # (POST /ra/c2pa/csr-jwt).
 #
 # An instance may hold at most TWO active credentials. To rotate a key: apply
-# with the new credential added (as a second trufo-ai_instance_credential), cut
+# with the new credential added (as a second trufo_instance_credential), cut
 # your signer over to the new key, then remove the old resource from the
 # config and apply again.
 #
 # Delete semantics: removing this resource from the config (or `terraform
 # destroy`) REVOKES the credential on the server — revocation is permanent.
-resource "trufo-ai_instance_credential" "primary" {
-  gpi_id         = trufo-ai_instance.signing.id
+resource "trufo_instance_credential" "primary" {
+  gpi_id         = trufo_instance.signing.id
   public_key_pem = file(var.credential_public_key_path)
   key_algorithm  = "ES256" # EC P-256; EdDSA (Ed25519) is also accepted
   label          = var.credential_label
