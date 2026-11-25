@@ -131,6 +131,16 @@ use `https://api.trufo.ai`, override with `TRUFO_PROD_API_URL`) and need:
    Trufo secrets configured on the repo (`TRUFO_TEST_API_KEY`, `TRUFO_ACCESS_TOKEN`,
    `TRUFO_REFRESH_TOKEN`, `TRUFO_TEST_GP_ID`).
 
+## Dependency updates (Renovate, auto-merge on green CI)
+
+[Renovate](renovate.json) (the Mend Renovate GitHub App — install it at <https://github.com/apps/renovate>
+for this repo) opens PRs for Go modules (both modules) and GitHub Actions. Minor/patch updates are
+**auto-merged automatically once CI is green** (`automerge` + `platformAutomerge` in `renovate.json`);
+major updates stay as PRs for review. For platform auto-merge to work, the repo needs:
+
+- Settings → General → "Allow auto-merge" enabled (set via API: `gh api -X PATCH repos/NitriKx/terraform-trufo-ai-provider -F allow_auto_merge=true`)
+- Branch protection on `main` requiring the CI status checks (`test`, `docs`) and disallowing force-pushes
+
 ## License
 
-Apache-2.0 — see [LICENSE](./LICENSE).
+MIT — see [LICENSE](./LICENSE).

@@ -52,4 +52,12 @@ Every API request carries exactly one credential. The provider supports both, li
 
 {{tffile "examples/provider/provider.tf"}}
 
+## Full example
+
+A complete C2PA signing instance with an enrolled key — generator product lookup by name, instance
+creation, and ES256 (EC P-256) public-key enrollment (see
+[`examples/full-signing-instance/`](https://github.com/NitriKx/terraform-trufo-ai-provider/tree/main/examples/full-signing-instance)):
+
+{{tffile "examples/full-signing-instance/main.tf"}}
+
 {{ .SchemaMarkdown }}

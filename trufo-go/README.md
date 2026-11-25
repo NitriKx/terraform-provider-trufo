@@ -31,4 +31,4 @@ carrying the HTTP status, the stable `detail` code, any 422 field errors, and th
 
 ## License
 
-Apache-2.0 — see [LICENSE](../LICENSE).
+MIT — see [LICENSE](../LICENSE).
